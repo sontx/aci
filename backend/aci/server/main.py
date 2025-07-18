@@ -28,6 +28,7 @@ from aci.server.routes import (
     functions,
     health,
     linked_accounts,
+    mcp_servers,
     organizations,
     projects,
     webhooks,
@@ -84,7 +85,7 @@ if config.ENVIRONMENT != "local":
     logfire.instrument_sqlalchemy()
 
 """middlewares are executed in the reverse order"""
-app.add_middleware(RateLimitMiddleware)
+# app.add_middleware(RateLimitMiddleware)
 app.add_middleware(SessionMiddleware, secret_key=config.SIGNING_KEY)
 # TODO: for now, we don't use TrustedHostMiddleware because it blocks health check from AWS ALB:
 # When ALB send health check request, it uses the task IP as the host, instead of the DNS name.
@@ -189,4 +190,11 @@ app.include_router(
     organizations.router,
     prefix=config.ROUTER_PREFIX_ORGANIZATIONS,
     tags=[config.ROUTER_PREFIX_ORGANIZATIONS.split("/")[-1]],
+)
+
+app.include_router(
+    mcp_servers.router,
+    prefix=config.ROUTER_PREFIX_MCP_SERVERS,
+    tags=[config.ROUTER_PREFIX_MCP_SERVERS.split("/")[-1]],
+    # dependencies=[Depends(deps.validate_api_key), Depends(deps.validate_project_quota)],
 )

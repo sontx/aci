@@ -200,11 +200,9 @@ async def execute(
     result = await execute_function(
         db_session=context.db_session,
         project=context.project,
-        agent=context.agent,
         function_name=function_name,
         function_input=body.function_input,
         linked_account_owner_id=body.linked_account_owner_id,
-        openai_client=openai_client,
     )
 
     end_time = datetime.now(UTC)
@@ -292,11 +290,9 @@ def format_function_definition(
 async def execute_function(
     db_session: Session,
     project: Project,
-    agent: Agent,
     function_name: str,
     function_input: dict,
     linked_account_owner_id: str,
-    openai_client: OpenAI,
 ) -> FunctionExecutionResult:
     """
     Execute a function with the given parameters.
@@ -356,16 +352,6 @@ async def execute_function(
             f"Configuration for app={function.app.name} is disabled, please enable the app first {config.DEV_PORTAL_URL}/appconfigs/{function.app.name}"
         )
 
-    # Check if the function is allowed to be executed by the agent
-    if function.app.name not in agent.allowed_apps:
-        logger.error(
-            f"Failed to execute function, App not allowed to be used by this agent, "
-            f"function_name={function_name} app_name={function.app.name} agent_id={agent.id}"
-        )
-        raise AppNotAllowedForThisAgent(
-            f"App={function.app.name} that this function belongs to is not allowed to be used by agent={agent.name}"
-        )
-
     # Check if the linked account status (configured, enabled, etc.)
     linked_account = crud.linked_accounts.get_linked_account(
         db_session,
@@ -408,13 +394,6 @@ async def execute_function(
         f"is_app_default_credentials={security_credentials_response.is_app_default_credentials}"
     )
     db_session.commit()
-
-    custom_instructions.check_for_violation(
-        openai_client,
-        function,
-        function_input,
-        agent.custom_instructions,
-    )
 
     function_executor = get_executor(function.protocol, linked_account)
     logger.info(
