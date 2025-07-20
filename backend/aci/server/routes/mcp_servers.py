@@ -1,16 +1,15 @@
 import asyncio
 import contextvars
-import io
 import json
 from typing import Annotated, Any, Dict, List
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Request, HTTPException
-from fastapi.responses import StreamingResponse
-from mcp import types, ServerCapabilities, ToolsCapability
-from mcp.server import Server, InitializationOptions
-from mcp.server.stdio import stdio_server
-from starlette.responses import JSONResponse
+from mcp import types
+from mcp.server.lowlevel import Server
+from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
+from starlette.responses import JSONResponse, Response, StreamingResponse
+from starlette.types import Receive, Scope, Send, Message
 
 from aci.common import processor
 from aci.common.db import crud
@@ -22,12 +21,6 @@ from aci.server import config
 from aci.server import dependencies as deps
 from aci.server.routes.functions import execute_function
 
-from typing import Iterable, AsyncIterator
-from anyio import create_memory_object_stream
-import anyio
-import mcp.types as types
-from mcp.shared.message import SessionMessage
-
 logger = get_logger(__name__)
 router = APIRouter()
 
@@ -37,13 +30,13 @@ linked_account_id_ctx_var = contextvars.ContextVar[str | None]("linked_account_i
 
 
 class MCPAppServer:
-    """MCP Server for a specific app"""
+    """MCP Server for a specific app using StreamableHTTPSessionManager"""
 
     def __init__(self, app_name: str):
         self.app_name = app_name
         self.server = Server(f"mcp-{app_name}")
-        self.list_tools_handler = None
-        self.call_tool_handler = None
+        self.session_manager = None
+        self._session_manager_started = False
         self._setup_handlers()
 
     def _setup_handlers(self):
@@ -55,6 +48,10 @@ class MCPAppServer:
             try:
                 # Get the app and its functions
                 context = mcp_request_ctx_var.get()
+                if not context:
+                    logger.warning(f"No context available for app {self.app_name}")
+                    return []
+
                 app = crud.apps.get_app(
                     context.db_session,
                     self.app_name,
@@ -63,6 +60,7 @@ class MCPAppServer:
                 )
 
                 if not app:
+                    logger.warning(f"App {self.app_name} not found")
                     return []
 
                 # Filter functions by visibility and active status
@@ -75,7 +73,7 @@ class MCPAppServer:
                 tools = []
                 for function in functions:
                     # Convert function to MCP tool format
-                    function_def = _format_function_definition(function)
+                    function_def = self._format_function_definition(function)
                     tool = types.Tool(
                         name=function_def.name,
                         description=function_def.description,
@@ -90,15 +88,6 @@ class MCPAppServer:
                 logger.error(f"Error listing tools for app {self.app_name}: {str(e)}")
                 return []
 
-        def _format_function_definition(
-                function: Function
-        ) -> AnthropicFunctionDefinition:
-            return AnthropicFunctionDefinition(
-                name=function.name,
-                description=function.description,
-                input_schema=processor.filter_visible_properties(function.parameters),
-            )
-
         @self.server.call_tool()
         async def call_tool(name: str, arguments: Dict[str, Any]) -> List[types.TextContent]:
             """Call a specific tool (function)"""
@@ -107,6 +96,9 @@ class MCPAppServer:
 
                 # Execute the function
                 context = mcp_request_ctx_var.get()
+                if not context:
+                    raise ValueError("No context available for tool execution")
+
                 result = await execute_function(
                     db_session=context.db_session,
                     project=context.project,
@@ -137,52 +129,64 @@ class MCPAppServer:
                 )
                 return [error_content]
 
-        # Store handlers for later use
-        self.list_tools_handler = list_tools
-        self.call_tool_handler = call_tool
+    def _format_function_definition(self, function: Function) -> AnthropicFunctionDefinition:
+        """Format function definition for MCP"""
+        return AnthropicFunctionDefinition(
+            name=function.name,
+            description=function.description,
+            input_schema=processor.filter_visible_properties(function.parameters),
+        )
+
+    async def get_session_manager(self, json_response: bool = False) -> StreamableHTTPSessionManager:
+        """Get or create StreamableHTTPSessionManager for this app"""
+        if self.session_manager is None:
+            self.session_manager = StreamableHTTPSessionManager(
+                app=self.server,
+                event_store=None,  # No event store for stateless mode
+                json_response=json_response,
+                stateless=True,  # True stateless mode
+            )
+
+        # Ensure session manager is started
+        if not self._session_manager_started:
+            await self.session_manager.__aenter__()
+            self._session_manager_started = True
+
+        return self.session_manager
+
+    async def handle_request(self, scope: Scope, receive: Receive, send: Send, json_response: bool = False) -> None:
+        """Handle HTTP request for this app's MCP server"""
+        session_manager = await self.get_session_manager(json_response=json_response)
+        await session_manager.handle_request(scope, receive, send)
+
+    async def cleanup(self):
+        """Clean up resources"""
+        if self.session_manager and self._session_manager_started:
+            try:
+                await self.session_manager.__aexit__(None, None, None)
+            except Exception as e:
+                logger.error(f"Error cleaning up session manager for app {self.app_name}: {e}")
+            finally:
+                self._session_manager_started = False
 
 
 # Global dictionary to cache MCP server instances for reuse
 mcp_servers_cache: Dict[str, MCPAppServer] = {}
 
-async def _run_single_mcp_request(
-    server: Server,
-    request_msg: types.JSONRPCMessage,
-) -> list[types.JSONRPCMessage]:
-    """
-    Feed one JSON‑RPC message into an MCP Server and collect all outbound
-    messages.  We use `stateless=True`, so every HTTP call is independent.
-    """
-    in_send,  in_recv  = create_memory_object_stream(max_buffer_size=0)
-    out_send, out_recv = create_memory_object_stream(max_buffer_size=0)
 
-    async def _srv():
-        await server.run(
-            read_stream=in_recv,
-            write_stream=out_send,
-            initialization_options=server.create_initialization_options(),
-            stateless=True,
-        )
+def get_or_create_mcp_server(app_name: str) -> MCPAppServer:
+    """Get or create MCP server instance for the given app"""
+    if app_name not in mcp_servers_cache:
+        logger.info(f"Creating new MCP server instance for app: {app_name}")
+        mcp_servers_cache[app_name] = MCPAppServer(app_name)
+    else:
+        logger.debug(f"Reusing cached MCP server instance for app: {app_name}")
 
-    async def _cli():
-        await in_send.send(SessionMessage(request_msg))
-        await in_send.aclose()
+    return mcp_servers_cache[app_name]
 
-    async with anyio.create_task_group() as tg:
-        tg.start_soon(_srv)
-        tg.start_soon(_cli)
 
-    messages: list[types.JSONRPCMessage] = []
-    async with out_recv:
-        async for sm in out_recv:
-            messages.append(sm.message)
-
-    return messages
-
-async def create_mcp_stream(app_name: str, context: deps.RequestContext) -> StreamingResponse:
-    """Create a streaming MCP server for a specific app"""
-
-    # Verify the app exists
+async def verify_app_exists(app_name: str, context: deps.RequestContext) -> None:
+    """Verify that the app exists and is accessible"""
     app = crud.apps.get_app(
         context.db_session,
         app_name,
@@ -193,158 +197,51 @@ async def create_mcp_stream(app_name: str, context: deps.RequestContext) -> Stre
     if not app:
         raise AppNotFound(f"App={app_name} not found")
 
-    # Get or create MCP server instance from cache
-    if app_name not in mcp_servers_cache:
-        logger.info(f"Creating new MCP server instance for app: {app_name}")
-        mcp_servers_cache[app_name] = MCPAppServer(app_name)
-    else:
-        logger.info(f"Reusing cached MCP server instance for app: {app_name}")
 
-    mcp_server = mcp_servers_cache[app_name]
-
-    async def generate_mcp_stream():
-        """Generate MCP protocol stream"""
-        try:
-            # Create in-memory streams for MCP communication
-            reader_stream = asyncio.StreamReader()
-            writer_stream = io.StringIO()
-
-            # Run the MCP server
-            capabilities = ServerCapabilities()
-            capabilities.tools = ToolsCapability()
-
-            # Use proper JSON-RPC transport instead of stdio
-            async with stdio_server() as (read_stream, write_stream):
-                await mcp_server.server.run(
-                    read_stream=read_stream,
-                    write_stream=write_stream,
-                    initialization_options=InitializationOptions(
-                        server_name=f"mcp-{app_name}",
-                        server_version=config.APP_VERSION,
-                        capabilities=capabilities
-                    )
-                )
-        except Exception as e:
-            print(e)
-            logger.error(f"Error in MCP stream for app {app_name}: {str(e)}")
-            yield json.dumps({"error": str(e)})
-
-    return StreamingResponse(
-        generate_mcp_stream(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "Access-Control-Allow-Origin": "*",
-        }
-    )
-
-@router.get("/{app_name}/tools", response_model=None)
-async def list_tools_json(
+@router.api_route("/{app_name}", methods=["GET", "POST"])
+async def mcp_handler(
     app_name: str,
-    context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
-):
-    mcp_request_ctx_var.set(context)
-
-    # Look‑up / cache the Server
-    srv = mcp_servers_cache.setdefault(app_name, MCPAppServer(app_name)).server
-
-    # Build a ListToolsRequest – no params object in MCP 1.12
-    list_req = types.ListToolsRequest()
-    msg = types.JSONRPCRequest(
-        jsonrpc="2.0",
-        id=str(uuid4()),
-        method=list_req.method,
-        params=list_req.params,  # this is `None`
-    )
-
-    responses = await _run_single_mcp_request(srv, msg)
-
-    # Return the first proper response
-    for m in responses:
-        if isinstance(m.root, types.JSONRPCResponse):
-            result = m.root.result  # -> ListToolsResult
-            return JSONResponse(result.model_dump(mode="json"))
-
-    # If only errors returned:
-    err = next(
-        (m.root for m in responses if isinstance(m.root, types.JSONRPCError)), None
-    )
-    raise HTTPException(status_code=500, detail=str(err or "Unknown error"))
-
-@router.post("/{app_name}/tools/{tool_name}/invoke")
-async def call_tool_json(
-    app_name: str,
-    tool_name: str,
     request: Request,
     context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
 ):
+    """
+    Main MCP handler that routes all MCP requests for a specific app.
+    Supports both streaming (SSE) and JSON responses based on Accept header.
+    """
+    # Verify app exists
+    await verify_app_exists(app_name, context)
 
+    # Set context variables
     mcp_request_ctx_var.set(context)
     linked_account_id_ctx_var.set(request.headers.get(config.LINKED_ACCOUNT_ID_HEADER))
 
-    srv = mcp_servers_cache.setdefault(app_name, MCPAppServer(app_name)).server
+    # Get MCP server for this app
+    mcp_server = get_or_create_mcp_server(app_name)
 
-    # Arguments come from JSON body like  {"args": {...}}
-    body = await request.json()
-    arguments = body.get("args", {})
+    # Determine response format based on Accept header
+    accept_header = request.headers.get("accept", "")
+    json_response = "application/json" in accept_header
 
-    call_req = types.CallToolRequest(
-        params=types.CallToolParams(name=tool_name, arguments=arguments)
+    # Buffer to collect response body parts
+    body_chunks: List[bytes] = []
+    response_headers = {}
+    status_code = 200
+
+    async def send(message: Message):
+        nonlocal status_code, response_headers
+        if message["type"] == "http.response.start":
+            status_code = message["status"]
+            response_headers = dict(message["headers"])
+        elif message["type"] == "http.response.body":
+            body_chunks.append(message.get("body", b""))
+            # If "more_body" is True, this may be called again
+
+    # Handle the request
+    await mcp_server.handle_request(request.scope, request.receive, send, json_response)
+
+    return StreamingResponse(
+        iter(body_chunks),
+        status_code=status_code,
+        headers=response_headers,
+        media_type=response_headers.get(b"content-type", b"application/octet-stream").decode(),
     )
-    msg = types.JSONRPCRequest(
-        jsonrpc="2.0",
-        id=str(uuid4()),
-        method=call_req.method(),
-        params=call_req.params,
-    )
-
-    responses = await _run_single_mcp_request(srv, msg)
-
-    for m in responses:
-        if isinstance(m.root, types.JSONRPCResponse):
-            return JSONResponse(m.root.result.model_dump(mode="json"))
-
-    err = next(
-        (m.root for m in responses if isinstance(m.root, types.JSONRPCError)), None
-    )
-    raise HTTPException(status_code=500, detail=str(err or "Unknown error"))
-
-@router.post("/{app_name}")
-async def mcp_root_single_message(
-    app_name: str,
-    request: Request,
-    context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
-):
-    """
-    Accept **any** single JSON‑RPC message for the given app and return the
-    first MCP response/error as `application/json`.
-
-    Suitable for `initialize`, `ping`, custom admin calls, etc.
-    """
-    # Parse inbound JSON
-    try:
-        payload = await request.json()
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"Invalid JSON: {exc}")
-
-    try:
-        inbound_msg = types.JSONRPCMessage.model_validate(payload)
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"Invalid JSON‑RPC: {exc}")
-
-    # Look‑up / cache Server
-    srv = mcp_servers_cache.setdefault(app_name, MCPAppServer(app_name)).server
-
-    # Run exactly one MCP request (stateless)
-    responses = await _run_single_mcp_request(srv, inbound_msg)
-
-    # Return the first response / error
-    for m in responses:
-        if isinstance(m.root, (types.JSONRPCResponse, types.JSONRPCError)):
-            return JSONResponse(
-                m.root.model_dump(mode="json", by_alias=True, exclude_none=True)
-            )
-
-    # No response produced – shouldn’t happen, but handle gracefully
-    raise HTTPException(status_code=500, detail="No response generated")

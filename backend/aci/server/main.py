@@ -4,7 +4,7 @@ import logfire
 import stripe
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
-from fastapi.routing import APIRoute
+from fastapi.routing import APIRoute, APIRouter
 from pythonjsonlogger.json import JsonFormatter
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
