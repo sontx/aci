@@ -1,14 +1,12 @@
-import asyncio
 import contextvars
 import json
 from typing import Annotated, Any, Dict, List
-from uuid import uuid4
 
-from fastapi import APIRouter, Depends, Request, HTTPException
+from fastapi import APIRouter, Depends, Request
 from mcp import types
 from mcp.server.lowlevel import Server
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
-from starlette.responses import JSONResponse, Response, StreamingResponse
+from starlette.responses import StreamingResponse
 from starlette.types import Receive, Scope, Send, Message
 
 from aci.common import processor
@@ -147,9 +145,11 @@ class MCPAppServer:
                 stateless=True,  # True stateless mode
             )
 
-        # Ensure session manager is started
+        # Start the session manager if not already started
         if not self._session_manager_started:
-            await self.session_manager.__aenter__()
+            # Start the session manager's run context once
+            self._session_context = self.session_manager.run()
+            await self._session_context.__aenter__()
             self._session_manager_started = True
 
         return self.session_manager
@@ -157,17 +157,22 @@ class MCPAppServer:
     async def handle_request(self, scope: Scope, receive: Receive, send: Send, json_response: bool = False) -> None:
         """Handle HTTP request for this app's MCP server"""
         session_manager = await self.get_session_manager(json_response=json_response)
+
+        # Session manager is already running from get_session_manager, just handle the request
         await session_manager.handle_request(scope, receive, send)
 
     async def cleanup(self):
         """Clean up resources"""
-        if self.session_manager and self._session_manager_started:
+        if self._session_manager_started and hasattr(self, '_session_context'):
             try:
-                await self.session_manager.__aexit__(None, None, None)
+                await self._session_context.__aexit__(None, None, None)
             except Exception as e:
-                logger.error(f"Error cleaning up session manager for app {self.app_name}: {e}")
-            finally:
-                self._session_manager_started = False
+                logger.warning(f"Error cleaning up session context for {self.app_name}: {e}")
+
+        self.session_manager = None
+        self._session_manager_started = False
+        if hasattr(self, '_session_context'):
+            delattr(self, '_session_context')
 
 
 # Global dictionary to cache MCP server instances for reuse
@@ -231,7 +236,18 @@ async def mcp_handler(
         nonlocal status_code, response_headers
         if message["type"] == "http.response.start":
             status_code = message["status"]
-            response_headers = dict(message["headers"])
+            # Convert headers from list of tuples to dict with string keys
+            headers_list = message.get("headers", [])
+            response_headers = {}
+            for header_tuple in headers_list:
+                if len(header_tuple) == 2:
+                    key, value = header_tuple
+                    # Ensure both key and value are strings
+                    if isinstance(key, bytes):
+                        key = key.decode('utf-8', errors='replace')
+                    if isinstance(value, bytes):
+                        value = value.decode('utf-8', errors='replace')
+                    response_headers[key] = value
         elif message["type"] == "http.response.body":
             body_chunks.append(message.get("body", b""))
             # If "more_body" is True, this may be called again
@@ -243,5 +259,5 @@ async def mcp_handler(
         iter(body_chunks),
         status_code=status_code,
         headers=response_headers,
-        media_type=response_headers.get(b"content-type", b"application/octet-stream").decode(),
+        media_type=response_headers.get("content-type", "application/octet-stream"),
     )
