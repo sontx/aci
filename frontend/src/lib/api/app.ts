@@ -1,5 +1,11 @@
 import { App } from "@/lib/types/app";
 
+export interface BasicFunctionDefinition {
+  name: string;
+  description: string;
+  tags: string[] | null;
+}
+
 export async function getAllApps(apiKey: string): Promise<App[]> {
   const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/v1/apps`, {
     method: "GET",
@@ -51,4 +57,28 @@ export async function getApp(
 ): Promise<App | null> {
   const apps = await getApps([appName], apiKey);
   return apps.length > 0 ? apps[0] : null;
+}
+
+export async function getAppFunctions(
+  appName: string,
+  apiKey: string,
+): Promise<BasicFunctionDefinition[]> {
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL}/v1/apps/${appName}/functions`,
+    {
+      method: "GET",
+      headers: {
+        "X-API-KEY": apiKey,
+      },
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to fetch app functions: ${response.status} ${response.statusText}`,
+    );
+  }
+
+  const functions = await response.json();
+  return functions;
 }

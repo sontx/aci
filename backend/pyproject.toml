@@ -35,6 +35,7 @@ dependencies = [
     "stripe>=12.1.0",
     "e2b-code-interpreter>=1.5.0",
     "mcp>=1.12.0",
+    "gunicorn>=23.0.0",
 ]
 
 [dependency-groups]

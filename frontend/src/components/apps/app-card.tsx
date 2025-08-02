@@ -1,6 +1,5 @@
 "use client";
-import Image from "next/image";
-import Link from "next/link";
+import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
@@ -8,17 +7,17 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { type App } from "@/lib/types/app";
-import { IdDisplay } from "@/components/apps/id-display";
 import {
   Tooltip,
-  TooltipTrigger,
   TooltipContent,
   TooltipProvider,
+  TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useAppLinkedAccounts } from "@/hooks/use-linked-account";
-import { Badge } from "@/components/ui/badge";
-import { CheckCircle } from "lucide-react";
+import { type App } from "@/lib/types/app";
+import { CheckCircle, CircleUser, Hammer } from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
 
 interface AppCardProps {
   app: App;
@@ -62,10 +61,51 @@ export function AppCard({ app, isConfigured = false }: AppCardProps) {
                   className="object-contain"
                 />
               </div>
-              <CardTitle className="truncate">{app.display_name}</CardTitle>
-            </div>
-            <div className="flex-shrink-0 w-24">
-              <IdDisplay id={app.name} />
+              <div>
+                <CardTitle className="truncate">{app.display_name}</CardTitle>
+                {(app.functions.length > 0 || linkedAccounts.length > 0) && (
+                  <TooltipProvider>
+                    <div className="flex gap-2 mt-1">
+                      {app.functions.length > 0 && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Badge
+                              className="h-6 min-w-5 px-2 font-mono tabular-nums"
+                              variant="outline"
+                            >
+                              <Hammer className="h-3 w-3 mr-1" />
+                              {app.functions.length}
+                            </Badge>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="text-xs">
+                              {`Functions in This App: ${app.functions.length}`}
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                      {linkedAccounts.length > 0 && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Badge
+                              className="h-6 min-w-5 px-2 font-mono tabular-nums"
+                              variant="outline"
+                            >
+                              <CircleUser className="h-3 w-3 mr-1" />
+                              {linkedAccounts.length}
+                            </Badge>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="text-xs">
+                              {`Linked Accounts: ${linkedAccounts.length}`}
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                    </div>
+                  </TooltipProvider>
+                )}
+              </div>
             </div>
           </div>
 
@@ -82,45 +122,15 @@ export function AppCard({ app, isConfigured = false }: AppCardProps) {
             </Tooltip>
           </TooltipProvider>
         </CardHeader>
-        <CardContent className="mt-auto flex justify-between">
-          <div className="flex flex-wrap items-start gap-2  ">
-            {app.categories.map((category) => (
-              <span
-                key={category}
-                className="rounded-md bg-gray-100 px-3 py-1 text-sm font-medium text-gray-600 border border-gray-200"
-              >
-                {category}
-              </span>
-            ))}
-          </div>
-          <TooltipProvider>
-            <div className="flex justify-end  items-end  flex-wrap gap-2  ">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="text-sm bg-gray-100 px-2.5 py-1 font-medium text-gray-600 border rounded-full border-gray-200">
-                    {app.functions.length}
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p className="text-xs">
-                    {`Functions in This App: ${app.functions.length}`}
-                  </p>
-                </TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="text-sm bg-blue-100 px-2.5 py-1 font-medium text-blue-600 border rounded-full border-blue-200">
-                    {linkedAccounts.length}
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p className="text-xs">
-                    {`Linked Accounts: ${linkedAccounts.length}`}
-                  </p>
-                </TooltipContent>
-              </Tooltip>
-            </div>
-          </TooltipProvider>
+        <CardContent className="flex flex-wrap items-start gap-2 mt-auto">
+          {app.categories.map((category) => (
+            <span
+              key={category}
+              className="rounded-md bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600 border border-gray-200"
+            >
+              {category}
+            </span>
+          ))}
         </CardContent>
       </Card>
     </Link>

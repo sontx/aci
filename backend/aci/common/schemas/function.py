@@ -208,6 +208,7 @@ class BasicFunctionDefinition(BaseModel):
 
     name: str
     description: str
+    tags: list[str] | None
 
     model_config = ConfigDict(from_attributes=True)
 

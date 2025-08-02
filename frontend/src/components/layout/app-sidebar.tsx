@@ -27,6 +27,7 @@ import { RiSettings3Line, RiLinkUnlinkM } from "react-icons/ri";
 import { AiOutlineRobot } from "react-icons/ai";
 import { HiOutlineChatBubbleBottomCenterText } from "react-icons/hi2";
 import { RiFileList3Line } from "react-icons/ri";
+import { HiOutlineServer } from "react-icons/hi2";
 
 import {
   Tooltip,
@@ -55,6 +56,11 @@ export const sidebarItems = [
     title: "Linked Accounts",
     url: `/linked-accounts`,
     icon: RiLinkUnlinkM,
+  },
+  {
+    title: "MCP Servers",
+    url: `/mcp-servers`,
+    icon: HiOutlineServer,
   },
   {
     title: "Agents",

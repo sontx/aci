@@ -5,7 +5,7 @@ from openai import OpenAI
 
 from aci.common.db import crud
 from aci.common.embeddings import generate_embedding
-from aci.common.enums import Visibility
+from aci.common.enums import Visibility, FunctionDefinitionFormat
 from aci.common.exceptions import AppNotFound
 from aci.common.logging_setup import get_logger
 from aci.common.schemas.app import (
@@ -16,6 +16,7 @@ from aci.common.schemas.app import (
 )
 from aci.common.schemas.function import BasicFunctionDefinition, FunctionDetails
 from aci.common.schemas.security_scheme import SecuritySchemesPublic
+from aci.server.utils import format_function_definition
 from aci.server import config
 from aci.server import dependencies as deps
 
@@ -182,3 +183,30 @@ async def get_app_details(
     )
 
     return app_details
+
+@router.get("/{app_name}/functions", response_model_exclude_none=True)
+async def get_app_functions(
+    context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
+    app_name: str,
+) -> list[BasicFunctionDefinition]:
+    """
+    Get all functions of an application.
+    """
+    app = crud.apps.get_app(
+        context.db_session,
+        app_name,
+        context.project.visibility_access == Visibility.PUBLIC,
+        True,
+    )
+
+    if not app:
+        logger.error(f"App not found, app_name={app_name}")
+        raise AppNotFound(f"App={app_name} not found")
+
+    functions = [
+        format_function_definition(function, format=FunctionDefinitionFormat.BASIC)
+        for function in app.functions
+        if function.active and function.visibility == Visibility.PUBLIC
+    ]
+
+    return functions

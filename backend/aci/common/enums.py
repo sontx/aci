@@ -86,6 +86,15 @@ class ClientIdentityProvider(StrEnum):
     # GITHUB = "github"
 
 
+class MCPAuthType(StrEnum):
+    """
+    Authentication type for MCP servers
+    """
+
+    SECRET_LINK = "secret_link"
+    OAUTH2 = "oauth2"
+
+
 class StripeSubscriptionStatus(StrEnum):
     """
     Stripe subscription status: https://docs.stripe.com/api/subscriptions/object#subscription_object-status

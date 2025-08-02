@@ -1,263 +1,346 @@
-import contextvars
-import json
-from typing import Annotated, Any, Dict, List
+from typing import Annotated
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request
-from mcp import types
-from mcp.server.lowlevel import Server
-from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
-from starlette.responses import StreamingResponse
-from starlette.types import Receive, Scope, Send, Message
+from fastapi import APIRouter, Depends, HTTPException, Query, status, Request
+from pydantic import BaseModel
 
-from aci.common import processor
 from aci.common.db import crud
-from aci.common.db.sql_models import Function
-from aci.common.exceptions import AppNotFound
+from aci.common.enums import MCPAuthType
 from aci.common.logging_setup import get_logger
-from aci.common.schemas.function import AnthropicFunctionDefinition
-from aci.server import config
 from aci.server import dependencies as deps
-from aci.server.routes.functions import execute_function
+from aci.server.mcp.mcp_handlers import handle_mcp_request
 
 logger = get_logger(__name__)
 router = APIRouter()
 
-mcp_request_ctx_var = contextvars.ContextVar[Annotated[deps.RequestContext, Depends(deps.get_request_context)] | None](
-    "mcp_request_ctx_var", default=None)
-linked_account_id_ctx_var = contextvars.ContextVar[str | None]("linked_account_id", default=None)
+
+# Pydantic models for request/response
+class MCPServerCreate(BaseModel):
+    name: str
+    app_config_id: UUID
+    auth_type: MCPAuthType
+    allowed_tools: list[str]
+    mcp_link: str | None = None
 
 
-class MCPAppServer:
-    """MCP Server for a specific app using StreamableHTTPSessionManager"""
+class MCPServerUpdate(BaseModel):
+    name: str | None = None
+    auth_type: MCPAuthType | None = None
+    allowed_tools: list[str] | None = None
+    mcp_link: str | None = None
 
-    def __init__(self, app_name: str):
-        self.app_name = app_name
-        self.server = Server(f"mcp-{app_name}")
-        self.session_manager = None
-        self._session_manager_started = False
-        self._setup_handlers()
 
-    def _setup_handlers(self):
-        """Setup MCP server handlers"""
+class MCPServerResponse(BaseModel):
+    id: str
+    name: str
+    app_config_id: UUID
+    app_name: str
+    auth_type: MCPAuthType
+    allowed_tools: list[str]
+    mcp_link: str | None
+    created_at: str
+    updated_at: str
 
-        @self.server.list_tools()
-        async def list_tools() -> List[types.Tool]:
-            """List all available tools (functions) for this app"""
-            try:
-                # Get the app and its functions
-                context = mcp_request_ctx_var.get()
-                if not context:
-                    logger.warning(f"No context available for app {self.app_name}")
-                    return []
 
-                app = crud.apps.get_app(
-                    context.db_session,
-                    self.app_name,
-                    False,
-                    True,
-                )
+class MCPServerListQuery(BaseModel):
+    app_config_id: UUID | None = None
+    auth_type: MCPAuthType | None = None
+    limit: int | None = None
+    offset: int | None = None
 
-                if not app:
-                    logger.warning(f"App {self.app_name} not found")
-                    return []
 
-                # Filter functions by visibility and active status
-                functions = [
-                    function
-                    for function in app.functions
-                    if function.active
-                ]
+@router.post("", response_model=MCPServerResponse, status_code=status.HTTP_201_CREATED)
+async def create_mcp_server(
+        context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
+        mcp_server_data: MCPServerCreate,
+) -> MCPServerResponse:
+    """
+    Create a new MCP server.
+    """
+    logger.debug(f"Creating MCP server: {mcp_server_data.name} for app_config_id: {mcp_server_data.app_config_id}")
 
-                tools = []
-                for function in functions:
-                    # Convert function to MCP tool format
-                    function_def = self._format_function_definition(function)
-                    tool = types.Tool(
-                        name=function_def.name,
-                        description=function_def.description,
-                        inputSchema=function_def.input_schema
-                    )
-                    tools.append(tool)
+    # Verify the app configuration exists
+    from aci.common.db.sql_models import AppConfiguration
+    from sqlalchemy import select
 
-                logger.info(f"Listed {len(tools)} tools for app {self.app_name}")
-                return tools
+    app_config_statement = select(AppConfiguration).filter_by(id=mcp_server_data.app_config_id)
+    app_config = context.db_session.execute(app_config_statement).scalar_one_or_none()
 
-            except Exception as e:
-                logger.error(f"Error listing tools for app {self.app_name}: {str(e)}")
-                return []
-
-        @self.server.call_tool()
-        async def call_tool(name: str, arguments: Dict[str, Any]) -> List[types.TextContent]:
-            """Call a specific tool (function)"""
-            try:
-                logger.info(f"Calling tool {name} with arguments: {arguments}")
-
-                # Execute the function
-                context = mcp_request_ctx_var.get()
-                if not context:
-                    raise ValueError("No context available for tool execution")
-
-                result = await execute_function(
-                    db_session=context.db_session,
-                    project=context.project,
-                    function_name=name,
-                    function_input=arguments,
-                    linked_account_owner_id=linked_account_id_ctx_var.get(),
-                )
-
-                # Format the result for MCP
-                if result.success:
-                    content = types.TextContent(
-                        type="text",
-                        text=json.dumps(result.data, indent=2, default=str)
-                    )
-                else:
-                    content = types.TextContent(
-                        type="text",
-                        text=f"Error: {result.error}"
-                    )
-
-                return [content]
-
-            except Exception as e:
-                logger.error(f"Error calling tool {name}: {str(e)}")
-                error_content = types.TextContent(
-                    type="text",
-                    text=f"Error executing tool {name}: {str(e)}"
-                )
-                return [error_content]
-
-    def _format_function_definition(self, function: Function) -> AnthropicFunctionDefinition:
-        """Format function definition for MCP"""
-        return AnthropicFunctionDefinition(
-            name=function.name,
-            description=function.description,
-            input_schema=processor.filter_visible_properties(function.parameters),
+    if not app_config:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"App configuration with ID {mcp_server_data.app_config_id} not found"
         )
 
-    async def get_session_manager(self, json_response: bool = False) -> StreamableHTTPSessionManager:
-        """Get or create StreamableHTTPSessionManager for this app"""
-        if self.session_manager is None:
-            self.session_manager = StreamableHTTPSessionManager(
-                app=self.server,
-                event_store=None,  # No event store for stateless mode
-                json_response=json_response,
-                stateless=True,  # True stateless mode
+    # Check if MCP server with the same name already exists for this app config
+    existing_server = crud.mcp_servers.get_mcp_server_by_name_and_app_config(
+        context.db_session,
+        mcp_server_data.name,
+        mcp_server_data.app_config_id
+    )
+
+    if existing_server:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"MCP server with name '{mcp_server_data.name}' already exists for this app configuration"
+        )
+
+    # Create the MCP server
+    mcp_server = crud.mcp_servers.create_mcp_server(
+        context.db_session,
+        name=mcp_server_data.name,
+        app_config_id=mcp_server_data.app_config_id,
+        auth_type=mcp_server_data.auth_type,
+        allowed_tools=mcp_server_data.allowed_tools,
+        mcp_link=mcp_server_data.mcp_link,
+    )
+
+    context.db_session.commit()
+
+    return MCPServerResponse(
+        id=mcp_server.id,
+        name=mcp_server.name,
+        app_config_id=mcp_server.app_config_id,
+        app_name=mcp_server.app_name,
+        auth_type=mcp_server.auth_type,
+        allowed_tools=mcp_server.allowed_tools,
+        mcp_link=mcp_server.mcp_link,
+        created_at=mcp_server.created_at.isoformat(),
+        updated_at=mcp_server.updated_at.isoformat(),
+    )
+
+
+@router.get("", response_model=list[MCPServerResponse])
+async def list_mcp_servers(
+        context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
+        query_params: Annotated[MCPServerListQuery, Query()],
+) -> list[MCPServerResponse]:
+    """
+    Get a list of MCP servers with optional filtering.
+    """
+    if query_params.app_config_id:
+        mcp_servers = crud.mcp_servers.get_mcp_servers_by_app_config(
+            context.db_session,
+            query_params.app_config_id,
+            query_params.limit,
+            query_params.offset,
+        )
+    else:
+        # If no app_config_id specified, we need a general list function
+        from aci.common.db.sql_models import MCPServer
+        from sqlalchemy import select
+
+        statement = select(MCPServer)
+
+        if query_params.auth_type:
+            statement = statement.filter_by(auth_type=query_params.auth_type)
+        if query_params.offset:
+            statement = statement.offset(query_params.offset)
+        if query_params.limit:
+            statement = statement.limit(query_params.limit)
+
+        mcp_servers = list(context.db_session.execute(statement).scalars().all())
+
+    response = []
+    for server in mcp_servers:
+        response.append(MCPServerResponse(
+            id=server.id,
+            name=server.name,
+            app_config_id=server.app_config_id,
+            app_name=server.app_name,
+            auth_type=server.auth_type,
+            allowed_tools=server.allowed_tools,
+            mcp_link=server.mcp_link,
+            created_at=server.created_at.isoformat(),
+            updated_at=server.updated_at.isoformat(),
+        ))
+
+    return response
+
+
+@router.get("/{mcp_server_id}", response_model=MCPServerResponse)
+async def get_mcp_server(
+        context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
+        mcp_server_id: str,
+) -> MCPServerResponse:
+    """
+    Get a specific MCP server by ID.
+    """
+    mcp_server = crud.mcp_servers.get_mcp_server_by_id(context.db_session, mcp_server_id)
+
+    if not mcp_server:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"MCP server with ID {mcp_server_id} not found"
+        )
+
+    return MCPServerResponse(
+        id=mcp_server.id,
+        name=mcp_server.name,
+        app_config_id=mcp_server.app_config_id,
+        app_name=mcp_server.app_name,
+        auth_type=mcp_server.auth_type,
+        allowed_tools=mcp_server.allowed_tools,
+        mcp_link=mcp_server.mcp_link,
+        created_at=mcp_server.created_at.isoformat(),
+        updated_at=mcp_server.updated_at.isoformat(),
+    )
+
+
+@router.put("/{mcp_server_id}", response_model=MCPServerResponse)
+async def update_mcp_server(
+        context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
+        mcp_server_id: str,
+        update_data: MCPServerUpdate,
+) -> MCPServerResponse:
+    """
+    Update an existing MCP server.
+    """
+    mcp_server = crud.mcp_servers.get_mcp_server_by_id(context.db_session, mcp_server_id)
+
+    if not mcp_server:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"MCP server with ID {mcp_server_id} not found"
+        )
+
+    # Check for name conflicts if name is being updated
+    if update_data.name and update_data.name != mcp_server.name:
+        existing_server = crud.mcp_servers.get_mcp_server_by_name_and_app_config(
+            context.db_session,
+            update_data.name,
+            mcp_server.app_config_id
+        )
+        if existing_server:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"MCP server with name '{update_data.name}' already exists for this app configuration"
             )
 
-        # Start the session manager if not already started
-        if not self._session_manager_started:
-            # Start the session manager's run context once
-            self._session_context = self.session_manager.run()
-            await self._session_context.__aenter__()
-            self._session_manager_started = True
-
-        return self.session_manager
-
-    async def handle_request(self, scope: Scope, receive: Receive, send: Send, json_response: bool = False) -> None:
-        """Handle HTTP request for this app's MCP server"""
-        session_manager = await self.get_session_manager(json_response=json_response)
-
-        # Session manager is already running from get_session_manager, just handle the request
-        await session_manager.handle_request(scope, receive, send)
-
-    async def cleanup(self):
-        """Clean up resources"""
-        if self._session_manager_started and hasattr(self, '_session_context'):
-            try:
-                await self._session_context.__aexit__(None, None, None)
-            except Exception as e:
-                logger.warning(f"Error cleaning up session context for {self.app_name}: {e}")
-
-        self.session_manager = None
-        self._session_manager_started = False
-        if hasattr(self, '_session_context'):
-            delattr(self, '_session_context')
-
-
-# Global dictionary to cache MCP server instances for reuse
-mcp_servers_cache: Dict[str, MCPAppServer] = {}
-
-
-def get_or_create_mcp_server(app_name: str) -> MCPAppServer:
-    """Get or create MCP server instance for the given app"""
-    if app_name not in mcp_servers_cache:
-        logger.info(f"Creating new MCP server instance for app: {app_name}")
-        mcp_servers_cache[app_name] = MCPAppServer(app_name)
-    else:
-        logger.debug(f"Reusing cached MCP server instance for app: {app_name}")
-
-    return mcp_servers_cache[app_name]
-
-
-async def verify_app_exists(app_name: str, context: deps.RequestContext) -> None:
-    """Verify that the app exists and is accessible"""
-    app = crud.apps.get_app(
+    # Update the server
+    updated_server = crud.mcp_servers.update_mcp_server(
         context.db_session,
-        app_name,
-        False,
-        True,
+        mcp_server,
+        name=update_data.name,
+        auth_type=update_data.auth_type,
+        allowed_tools=update_data.allowed_tools,
+        mcp_link=update_data.mcp_link,
     )
 
-    if not app:
-        raise AppNotFound(f"App={app_name} not found")
+    context.db_session.commit()
+
+    return MCPServerResponse(
+        id=updated_server.id,
+        name=updated_server.name,
+        app_config_id=updated_server.app_config_id,
+        app_name=updated_server.app_name,
+        auth_type=updated_server.auth_type,
+        allowed_tools=updated_server.allowed_tools,
+        mcp_link=updated_server.mcp_link,
+        created_at=updated_server.created_at.isoformat(),
+        updated_at=updated_server.updated_at.isoformat(),
+    )
 
 
-@router.api_route("/{app_name}", methods=["GET", "POST"])
+@router.delete("/{mcp_server_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_mcp_server(
+        context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
+        mcp_server_id: str,
+) -> None:
+    """
+    Delete an MCP server by ID.
+    """
+    success = crud.mcp_servers.delete_mcp_server(context.db_session, mcp_server_id)
+
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"MCP server with ID {mcp_server_id} not found"
+        )
+
+    context.db_session.commit()
+
+
+@router.post("/{mcp_server_id}/tools/{tool_function_id}", response_model=MCPServerResponse)
+async def add_tool_to_mcp_server(
+        context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
+        mcp_server_id: str,
+        tool_function_id: str,
+) -> MCPServerResponse:
+    """
+    Add a tool to an MCP server's allowed tools list.
+    """
+    mcp_server = crud.mcp_servers.get_mcp_server_by_id(context.db_session, mcp_server_id)
+
+    if not mcp_server:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"MCP server with ID {mcp_server_id} not found"
+        )
+
+    updated_server = crud.mcp_servers.add_tool_to_mcp_server(
+        context.db_session,
+        mcp_server,
+        tool_function_id,
+    )
+
+    context.db_session.commit()
+
+    return MCPServerResponse(
+        id=updated_server.id,
+        name=updated_server.name,
+        app_config_id=updated_server.app_config_id,
+        app_name=updated_server.app_name,
+        auth_type=updated_server.auth_type,
+        allowed_tools=updated_server.allowed_tools,
+        mcp_link=updated_server.mcp_link,
+        created_at=updated_server.created_at.isoformat(),
+        updated_at=updated_server.updated_at.isoformat(),
+    )
+
+
+@router.delete("/{mcp_server_id}/tools/{tool_function_id}", response_model=MCPServerResponse)
+async def remove_tool_from_mcp_server(
+        context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
+        mcp_server_id: str,
+        tool_function_id: str,
+) -> MCPServerResponse:
+    """
+    Remove a tool from an MCP server's allowed tools list.
+    """
+    mcp_server = crud.mcp_servers.get_mcp_server_by_id(context.db_session, mcp_server_id)
+
+    if not mcp_server:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"MCP server with ID {mcp_server_id} not found"
+        )
+
+    updated_server = crud.mcp_servers.remove_tool_from_mcp_server(
+        context.db_session,
+        mcp_server,
+        tool_function_id,
+    )
+
+    context.db_session.commit()
+
+    return MCPServerResponse(
+        id=updated_server.id,
+        name=updated_server.name,
+        app_config_id=updated_server.app_config_id,
+        app_name=updated_server.app_name,
+        auth_type=updated_server.auth_type,
+        allowed_tools=updated_server.allowed_tools,
+        mcp_link=updated_server.mcp_link,
+        created_at=updated_server.created_at.isoformat(),
+        updated_at=updated_server.updated_at.isoformat(),
+    )
+
+
+@router.api_route("/{link}/mcp", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
 async def mcp_handler(
-    app_name: str,
-    request: Request,
-    context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
+        link: str,
+        request: Request,
+        context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
 ):
-    """
-    Main MCP handler that routes all MCP requests for a specific app.
-    Supports both streaming (SSE) and JSON responses based on Accept header.
-    """
-    # Verify app exists
-    await verify_app_exists(app_name, context)
-
-    # Set context variables
-    mcp_request_ctx_var.set(context)
-    linked_account_id_ctx_var.set(request.headers.get(config.LINKED_ACCOUNT_ID_HEADER))
-
-    # Get MCP server for this app
-    mcp_server = get_or_create_mcp_server(app_name)
-
-    # Determine response format based on Accept header
-    accept_header = request.headers.get("accept", "")
-    json_response = "application/json" in accept_header
-
-    # Buffer to collect response body parts
-    body_chunks: List[bytes] = []
-    response_headers = {}
-    status_code = 200
-
-    async def send(message: Message):
-        nonlocal status_code, response_headers
-        if message["type"] == "http.response.start":
-            status_code = message["status"]
-            # Convert headers from list of tuples to dict with string keys
-            headers_list = message.get("headers", [])
-            response_headers = {}
-            for header_tuple in headers_list:
-                if len(header_tuple) == 2:
-                    key, value = header_tuple
-                    # Ensure both key and value are strings
-                    if isinstance(key, bytes):
-                        key = key.decode('utf-8', errors='replace')
-                    if isinstance(value, bytes):
-                        value = value.decode('utf-8', errors='replace')
-                    response_headers[key] = value
-        elif message["type"] == "http.response.body":
-            body_chunks.append(message.get("body", b""))
-            # If "more_body" is True, this may be called again
-
-    # Handle the request
-    await mcp_server.handle_request(request.scope, request.receive, send, json_response)
-
-    return StreamingResponse(
-        iter(body_chunks),
-        status_code=status_code,
-        headers=response_headers,
-        media_type=response_headers.get("content-type", "application/octet-stream"),
-    )
+    return handle_mcp_request(link, request, context)

@@ -45,6 +45,7 @@ from aci.common.db.custom_sql_types import (
 )
 from aci.common.enums import (
     APIKeyStatus,
+    MCPAuthType,
     Protocol,
     SecurityScheme,
     StripeSubscriptionInterval,
@@ -238,7 +239,7 @@ class Function(Base):
     # empty dict for function that takes no args
     parameters: Mapped[dict] = mapped_column(MutableDict.as_mutable(JSONB), nullable=False)
     # TODO: should response schema be generic (data + execution success of not + optional error) or specific to the function
-    response: Mapped[dict] = mapped_column(MutableDict.as_mutable(JSONB), nullable=False)
+    response: Mapped[dict] = mapped_column(MutableDict.as_mutable(JSONB), nullable=True)
     # TODO: should we provide EMBEDDING_DIMENSION here? which makes it less flexible if we want to change the embedding dimention in the future
     embedding: Mapped[list[float]] = mapped_column(Vector(EMBEDDING_DIMENSION), nullable=False)
 
@@ -382,6 +383,53 @@ class AppConfiguration(Base):
         # If in the future we want to allow a project to integrate the same app multiple times, we can remove the unique constraint
         # but that would require changes in other places (business logic and other tables)
         UniqueConstraint("project_id", "app_id", name="uc_project_app"),
+    )
+
+
+class MCPServer(Base):
+    """
+    MCP (Model Context Protocol) Server configuration for an app configuration.
+    Each MCP server belongs to one app configuration and has a unique name within that app configuration.
+    """
+
+    __tablename__ = "mcp_servers"
+
+    id: Mapped[str] = mapped_column(String(MAX_STRING_LENGTH), primary_key=True)
+    name: Mapped[str] = mapped_column(String(MAX_STRING_LENGTH), nullable=False)
+    app_config_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("app_configurations.id"), nullable=False
+    )
+    auth_type: Mapped[MCPAuthType] = mapped_column(SqlEnum(MCPAuthType), nullable=False)
+    # list of function IDs that this MCP server is allowed to access
+    allowed_tools: Mapped[list[str]] = mapped_column(
+        ARRAY(String(MAX_STRING_LENGTH)), nullable=False
+    )
+    # MCP link for secret_link auth type (nullable for oauth2 auth type)
+    mcp_link: Mapped[str | None] = mapped_column(String(MAX_STRING_LENGTH), nullable=True, index=True, unique=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=False), server_default=func.now(), nullable=False, init=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=False),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+        init=False,
+    )
+    last_used_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=False), nullable=True, init=False
+    )
+
+    app_configuration: Mapped[AppConfiguration] = relationship("AppConfiguration", lazy="select", init=False)
+
+    @property
+    def app_name(self) -> str:
+        return str(self.app_configuration.app_name)
+
+    # unique constraint: name is unique within an app configuration
+    __table_args__ = (
+        UniqueConstraint("app_config_id", "name", name="uc_app_config_mcp_server_name"),
     )
 
 
@@ -578,6 +626,7 @@ __all__ = [
     "Base",
     "Function",
     "LinkedAccount",
+    "MCPServer",
     "Project",
     "Secret",
 ]

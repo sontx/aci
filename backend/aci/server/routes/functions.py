@@ -6,17 +6,14 @@ from fastapi import APIRouter, Depends, Query
 from openai import OpenAI
 from sqlalchemy.orm import Session
 
-from aci.common import processor
 from aci.common.db import crud
-from aci.common.db.sql_models import Agent, Function, Project
+from aci.common.db.sql_models import Function, Project
 from aci.common.embeddings import generate_embedding
 from aci.common.enums import FunctionDefinitionFormat, Visibility
 from aci.common.exceptions import (
     AppConfigurationDisabled,
     AppConfigurationNotFound,
-    AppNotAllowedForThisAgent,
     FunctionNotFound,
-    InvalidFunctionDefinitionFormat,
     LinkedAccountDisabled,
     LinkedAccountNotFound,
 )
@@ -29,15 +26,15 @@ from aci.common.schemas.function import (
     FunctionExecutionResult,
     FunctionsList,
     FunctionsSearch,
-    OpenAIFunction,
     OpenAIFunctionDefinition,
     OpenAIResponsesFunctionDefinition,
 )
-from aci.server import config, custom_instructions, utils
+from aci.server import config, utils
 from aci.server import dependencies as deps
 from aci.server import security_credentials_manager as scm
 from aci.server.function_executors import get_executor
 from aci.server.security_credentials_manager import SecurityCredentialsResponse
+from aci.server.utils import format_function_definition
 
 router = APIRouter()
 logger = get_logger(__name__)
@@ -243,48 +240,6 @@ async def execute(
         },
     )
     return result
-
-
-# TODO: move to agent/tools.py or a util function
-def format_function_definition(
-    function: Function, format: FunctionDefinitionFormat
-) -> (
-    BasicFunctionDefinition
-    | OpenAIFunctionDefinition
-    | OpenAIResponsesFunctionDefinition
-    | AnthropicFunctionDefinition
-):
-    match format:
-        case FunctionDefinitionFormat.BASIC:
-            return BasicFunctionDefinition(
-                name=function.name,
-                description=function.description,
-            )
-        case FunctionDefinitionFormat.OPENAI:
-            return OpenAIFunctionDefinition(
-                function=OpenAIFunction(
-                    name=function.name,
-                    description=function.description,
-                    parameters=processor.filter_visible_properties(function.parameters),
-                )
-            )
-        case FunctionDefinitionFormat.OPENAI_RESPONSES:
-            # Create a properly formatted OpenAIResponsesFunctionDefinition
-            # This format is used by the OpenAI chat completions API
-            return OpenAIResponsesFunctionDefinition(
-                type="function",
-                name=function.name,
-                description=function.description,
-                parameters=processor.filter_visible_properties(function.parameters),
-            )
-        case FunctionDefinitionFormat.ANTHROPIC:
-            return AnthropicFunctionDefinition(
-                name=function.name,
-                description=function.description,
-                input_schema=processor.filter_visible_properties(function.parameters),
-            )
-        case _:
-            raise InvalidFunctionDefinitionFormat(f"Invalid format: {format}")
 
 
 async def execute_function(

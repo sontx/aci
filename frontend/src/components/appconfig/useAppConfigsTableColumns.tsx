@@ -7,7 +7,6 @@ import Link from "next/link";
 import { GoTrash } from "react-icons/go";
 import { App } from "@/lib/types/app";
 import Image from "next/image";
-import { IdDisplay } from "@/components/apps/id-display";
 import { useUpdateAppConfig, useDeleteAppConfig } from "@/hooks/use-app-config";
 import {
   AlertDialog,
@@ -21,7 +20,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { ArrowUpDown } from "lucide-react";
+import { ArrowUpDown, Eye } from "lucide-react";
 const columnHelper = createColumnHelper<AppConfig>();
 
 interface AppConfigsTableColumnsProps {
@@ -56,7 +55,10 @@ export const useAppConfigsTableColumns = ({
         cell: (info) => {
           const appName = info.getValue();
           return (
-            <div className="flex items-center gap-3">
+            <Link
+              href={`/apps/${appName}`}
+              className="flex items-center gap-3 cursor-pointer hover:text-blue-600 hover:underline"
+            >
               <div className="relative h-5 w-5 flex-shrink-0 overflow-hidden">
                 {appsMap[appName]?.logo && (
                   <Image
@@ -67,8 +69,8 @@ export const useAppConfigsTableColumns = ({
                   />
                 )}
               </div>
-              <IdDisplay id={appName} dim={false} />
-            </div>
+              {appName}
+            </Link>
           );
         },
         enableGlobalFilter: true,
@@ -156,8 +158,8 @@ export const useAppConfigsTableColumns = ({
           return (
             <div className="space-x-2 flex">
               <Link href={`/appconfigs/${config.app_name}`}>
-                <Button variant="outline" size="sm">
-                  Open
+                <Button variant="ghost" size="sm">
+                  <Eye />
                 </Button>
               </Link>
               <AlertDialog>

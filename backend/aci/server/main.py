@@ -196,5 +196,4 @@ app.include_router(
     mcp_servers.router,
     prefix=config.ROUTER_PREFIX_MCP_SERVERS,
     tags=[config.ROUTER_PREFIX_MCP_SERVERS.split("/")[-1]],
-    # dependencies=[Depends(deps.validate_api_key), Depends(deps.validate_project_quota)],
 )

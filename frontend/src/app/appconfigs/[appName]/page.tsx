@@ -12,7 +12,7 @@ import {
   TooltipTrigger,
   TooltipContent,
 } from "@/components/ui/tooltip";
-import { GoTrash } from "react-icons/go";
+import { GoPlus, GoTrash } from "react-icons/go";
 import { useParams } from "next/navigation";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { AddAccountForm } from "@/components/appconfig/add-account";
@@ -40,6 +40,8 @@ import {
   useUpdateLinkedAccount,
 } from "@/hooks/use-linked-account";
 import { useApp } from "@/hooks/use-app";
+import { useAppConfig } from "@/hooks/use-app-config";
+import { MCPServerForm } from "@/components/mcpserver/mcp-server-form";
 
 const columnHelper = createColumnHelper<LinkedAccount>();
 
@@ -47,6 +49,7 @@ export default function AppConfigDetailPage() {
   const { appName } = useParams<{ appName: string }>();
 
   const { app } = useApp(appName);
+  const { data: appConfig } = useAppConfig(appName);
 
   const { data: linkedAccounts = [] } = useAppLinkedAccounts(appName);
 
@@ -242,17 +245,28 @@ export default function AppConfigDetailPage() {
             <IdDisplay id={app?.name ?? ""} />
           </div>
         </div>
-        {app && (
-          <AddAccountForm
-            appInfos={[
-              {
-                name: app.name,
-                logo: app.logo,
-                supported_security_schemes:
-                  app.supported_security_schemes || {},
-              },
-            ]}
-          />
+        {app && appConfig && (
+          <div className="flex items-center gap-2">
+            <MCPServerForm 
+              title="Add MCP Server"
+              defaultAppConfigId={appConfig.id}
+            >
+              <Button>
+                <GoPlus className="mr-2 h-4 w-4" />
+                Add MCP Server
+              </Button>
+            </MCPServerForm>
+            <AddAccountForm
+              appInfos={[
+                {
+                  name: app.name,
+                  logo: app.logo,
+                  supported_security_schemes:
+                    app.supported_security_schemes || {},
+                },
+              ]}
+            />
+          </div>
         )}
       </div>
 

@@ -8,6 +8,7 @@ from . import (
     projects,
     secret,
     subscriptions,
+    mcp_servers
 )
 
 __all__ = [
@@ -20,4 +21,5 @@ __all__ = [
     "projects",
     "secret",
     "subscriptions",
+    "mcp_servers",
 ]

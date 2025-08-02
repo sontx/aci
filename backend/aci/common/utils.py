@@ -21,7 +21,7 @@ def check_and_get_env_variable(name: str) -> str:
 
 
 def construct_db_url(
-    scheme: str, user: str, password: str, host: str, port: str, db_name: str
+        scheme: str, user: str, password: str, host: str, port: str, db_name: str
 ) -> str:
     return f"{scheme}://{user}:{password}@{host}:{port}/{db_name}"
 
@@ -87,6 +87,29 @@ def snake_to_camel(string: str) -> str:
     """
     parts = string.split("_")
     return parts[0] + "".join(word.capitalize() for word in parts[1:])
+
+
+def to_snake_case(string: str) -> str:
+    """
+    Convert a string to snake_case.
+    Handles CamelCase and replaces hyphens with underscores.
+    e.g., "SnakeCase-String" -> "snake_case_string"
+    """
+    string = string.replace("-", "_")
+    string = re.sub(r"(.)([A-Z][a-z]+)", r"\1_\2", string)
+    string = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", string)
+    return string.lower()
+
+
+def random_string(length: int = 10) -> str:
+    """
+    Generate a random string of fixed length.
+    """
+    import random
+    import string
+
+    letters = string.ascii_letters + string.digits
+    return ''.join(random.choice(letters) for _ in range(length))
 
 
 def is_uuid(value: str | UUID) -> bool:
