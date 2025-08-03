@@ -5,6 +5,7 @@ export interface BasicFunctionDefinition {
   name: string;
   description: string;
   tags: string[] | null;
+  display_name: string;
 }
 
 export async function getAllApps(apiKey: string): Promise<App[]> {

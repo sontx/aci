@@ -9,15 +9,21 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { RouterLink } from "@/components/ui/router-link";
+import { RouterLink } from "@/components/ui-extensions/router-link";
 
 interface IdDisplayProps {
   id: string;
+  displayName?: string;
   dim?: boolean;
   href?: string;
 }
 
-export function IdDisplay({ id, href, dim = true }: IdDisplayProps) {
+export function IdDisplay({
+  id,
+  displayName,
+  href,
+  dim = true,
+}: IdDisplayProps) {
   const copyToClipboard = () => {
     if (!navigator.clipboard) {
       console.error("Clipboard API not supported");
@@ -41,7 +47,7 @@ export function IdDisplay({ id, href, dim = true }: IdDisplayProps) {
         dim && "text-gray-500"
       } truncate min-w-0 cursor-default`}
     >
-      {id}
+      {displayName ?? id}
     </span>
   );
 

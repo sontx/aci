@@ -2,8 +2,10 @@ from aci.common import processor
 from aci.common.db.sql_models import Function
 from aci.common.enums import FunctionDefinitionFormat
 from aci.common.exceptions import InvalidFunctionDefinitionFormat
+from aci.common.jsonschema_markdown import generate_jsonschema_to_markdown
 from aci.common.schemas.function import BasicFunctionDefinition, OpenAIFunctionDefinition, \
-    OpenAIResponsesFunctionDefinition, AnthropicFunctionDefinition, OpenAIFunction, FunctionDetails
+    OpenAIResponsesFunctionDefinition, AnthropicFunctionDefinition, OpenAIFunction, FunctionDetails, \
+    generate_display_name
 
 
 def truncate_if_too_large(data: str, max_size: int) -> str:
@@ -27,6 +29,8 @@ def format_function_definition(
 ):
     match format:
         case FunctionDefinitionFormat.RAW:
+            parameter_markdown = generate_jsonschema_to_markdown(function.parameters) if function.parameters else ""
+            response_markdown = generate_jsonschema_to_markdown(function.response) if function.response else ""
             return FunctionDetails(
                 id=function.id,
                 app_name=function.app_name,
@@ -37,8 +41,8 @@ def format_function_definition(
                 active=function.active,
                 protocol=function.protocol,
                 protocol_data=function.protocol_data,
-                response=function.response,
-                parameters=function.parameters,
+                response=response_markdown,
+                parameters=parameter_markdown,
                 created_at=function.created_at,
                 updated_at=function.updated_at,
             )
@@ -47,6 +51,7 @@ def format_function_definition(
                 name=function.name,
                 description=function.description,
                 tags=function.tags,
+                display_name=generate_display_name(app_name=function.app_name, function_name=function.name),
             )
         case FunctionDefinitionFormat.OPENAI:
             return OpenAIFunctionDefinition(

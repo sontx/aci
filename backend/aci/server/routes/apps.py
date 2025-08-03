@@ -110,14 +110,7 @@ async def search_apps(
     apps: list[AppBasic] = []
 
     for app, _ in apps_with_scores:
-        if query_params.include_functions:
-            functions = [
-                BasicFunctionDefinition(name=function.name, description=function.description, tags=function.tags)
-                for function in app.functions
-            ]
-            apps.append(AppBasic(name=app.name, description=app.description, functions=functions))
-        else:
-            apps.append(AppBasic(name=app.name, description=app.description))
+        apps.append(AppBasic(name=app.name, description=app.description))
 
     logger.info(
         "Search apps result",

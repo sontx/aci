@@ -2,9 +2,12 @@ export interface AppFunction {
   id: string;
   app_name: string;
   name: string;
+  display_name: string;
   description: string;
   tags: string[];
-  parameters: object;
+  parameters: string;
+  response?: string;
+  protocol: "rest" | "connector" | "graphql" | "websocket" | "grpc";
 }
 
 export interface FunctionExecute {

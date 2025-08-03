@@ -13,12 +13,13 @@ export const useAppFunctionsColumns = (): ColumnDef<AppFunction>[] => {
   const { appName } = useParams<{ appName: string }>();
   return useMemo(() => {
     return [
-      columnHelper.accessor("name", {
+      columnHelper.accessor("display_name", {
         header: "Function Name",
         cell: (info) => (
           <IdDisplay
-            href={`/apps/${appName}/functions/${encodeURIComponent(info.getValue())}`}
-            id={info.getValue()}
+            href={`/apps/${appName}/functions/${info.row.original.name}`}
+            id={info.row.original.name}
+            displayName={info.getValue()}
             dim={false}
           />
         ),

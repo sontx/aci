@@ -2,7 +2,7 @@ import type { App } from "@/lib/types/app";
 import { AppConfig } from "@/lib/types/appconfig";
 import Image from "next/image";
 import { useAppsMap } from "@/hooks/use-app";
-import { RouterLink } from "@/components/ui/router-link";
+import { RouterLink } from "@/components/ui-extensions/router-link";
 
 interface AppItemDisplayProps {
   app?: App;

@@ -3,7 +3,7 @@ from typing import Annotated, Any, Literal
 from uuid import UUID
 
 import jsonschema
-from pydantic import BaseModel, ConfigDict, Field, RootModel, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, RootModel, field_validator, model_validator, computed_field
 
 from aci.common.db.sql_models import MAX_STRING_LENGTH
 from aci.common.enums import (
@@ -165,13 +165,34 @@ class FunctionDetails(BaseModel):
     active: bool
     protocol: Protocol
     protocol_data: dict
-    parameters: dict
-    response: dict
+    parameters: str
+    response: str
 
     created_at: datetime
     updated_at: datetime
 
+    @computed_field
+    @property
+    def display_name(self) -> str:
+        return generate_display_name(self.app_name, self.name)
+
     model_config = ConfigDict(from_attributes=True)
+
+
+def generate_display_name(
+        app_name: str, function_name: str, separator: str = "__") -> str:
+    """
+    Strip the app_name from the function's name and convert from upper snake case to title case.
+    Example: GMAIL__THREADS_LIST with app_name GMAIL becomes "Threads List"
+    """
+    # Remove app_name prefix and double underscore if present
+    if function_name.startswith(f"{app_name}{separator}"):
+        remaining_name = function_name[len(app_name) + len(separator):]
+    else:
+        remaining_name = function_name
+
+    # Convert from upper snake case to title case
+    return remaining_name.replace("_", " ").title()
 
 
 class OpenAIFunction(BaseModel):
@@ -208,9 +229,9 @@ class BasicFunctionDefinition(BaseModel):
 
     name: str
     description: str
+    display_name: str
     tags: list[str] | None
 
-    model_config = ConfigDict(from_attributes=True)
 
 class FunctionExecutionResult(BaseModel):
     success: bool

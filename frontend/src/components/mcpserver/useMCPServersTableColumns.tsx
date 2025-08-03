@@ -18,7 +18,7 @@ import {
 import { toast } from "sonner";
 import { useDeleteMCPServer } from "@/hooks/use-mcp-server";
 import { AppItemDisplay } from "@/components/apps/app-item-display";
-import { RouterLink } from "@/components/ui/router-link";
+import { RouterLink } from "@/components/ui-extensions/router-link";
 import { formatToLocalTime } from "@/utils/time";
 
 const columnHelper = createColumnHelper<MCPServerResponse>();

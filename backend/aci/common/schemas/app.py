@@ -88,10 +88,6 @@ class AppsSearch(BaseModel):
         default=False,
         description="If true, only return apps that are allowed by the agent/accessor, identified by the api key.",
     )
-    include_functions: bool = Field(
-        default=False,
-        description="If true, include functions (name and description) of each app in the response.",
-    )
     categories: list[str] | None = Field(
         default=None, description="List of categories for filtering."
     )

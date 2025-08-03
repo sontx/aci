@@ -24,37 +24,41 @@ export function FunctionsSelector({
   noFixHeight = false,
 }: FunctionsSelectorProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  
+
   // Use React Query hook to fetch functions
-  const { 
-    data: functions = [], 
-    isLoading, 
-    error: queryError 
+  const {
+    data: functions = [],
+    isLoading,
+    error: queryError,
   } = useAppFunctions(appName);
-  
+
   const error = queryError ? "Failed to load functions" : null;
 
   // Filter functions based on search query
   const filteredFunctions = useMemo(() => {
     if (!searchQuery.trim()) return functions;
-    
+
     const query = searchQuery.toLowerCase();
     return functions.filter(
       (func) =>
-        func.name.toLowerCase().includes(query) ||
-        func.description.toLowerCase().includes(query)
+        func.display_name.toLowerCase().includes(query) ||
+        func.description.toLowerCase().includes(query),
     );
   }, [functions, searchQuery]);
 
   // Check if all visible functions are selected
   const allVisibleSelected = useMemo(() => {
     if (filteredFunctions.length === 0) return false;
-    return filteredFunctions.every((func) => selectedFunctions.includes(func.name));
+    return filteredFunctions.every((func) =>
+      selectedFunctions.includes(func.name),
+    );
   }, [filteredFunctions, selectedFunctions]);
 
   // Check if some (but not all) visible functions are selected
   const someVisibleSelected = useMemo(() => {
-    return filteredFunctions.some((func) => selectedFunctions.includes(func.name));
+    return filteredFunctions.some((func) =>
+      selectedFunctions.includes(func.name),
+    );
   }, [filteredFunctions, selectedFunctions]);
 
   const handleSelectAll = () => {
@@ -62,14 +66,14 @@ export function FunctionsSelector({
       // Unselect all visible functions
       const visibleFunctionNames = filteredFunctions.map((func) => func.name);
       const newSelection = selectedFunctions.filter(
-        (name) => !visibleFunctionNames.includes(name)
+        (name) => !visibleFunctionNames.includes(name),
       );
       onSelectionChange(newSelection);
     } else {
       // Select all visible functions
       const visibleFunctionNames = filteredFunctions.map((func) => func.name);
       const newSelection = Array.from(
-        new Set([...selectedFunctions, ...visibleFunctionNames])
+        new Set([...selectedFunctions, ...visibleFunctionNames]),
       );
       onSelectionChange(newSelection);
     }
@@ -81,7 +85,9 @@ export function FunctionsSelector({
         onSelectionChange([...selectedFunctions, functionName]);
       }
     } else {
-      onSelectionChange(selectedFunctions.filter((name) => name !== functionName));
+      onSelectionChange(
+        selectedFunctions.filter((name) => name !== functionName),
+      );
     }
   };
 
@@ -113,11 +119,11 @@ export function FunctionsSelector({
           <Checkbox
             id="select-all"
             checked={
-              allVisibleSelected 
-                ? true 
-                : someVisibleSelected && !allVisibleSelected 
-                ? "indeterminate" 
-                : false
+              allVisibleSelected
+                ? true
+                : someVisibleSelected && !allVisibleSelected
+                  ? "indeterminate"
+                  : false
             }
             onCheckedChange={handleSelectAll}
             disabled={disabled || isLoading}
@@ -126,8 +132,8 @@ export function FunctionsSelector({
             {allVisibleSelected
               ? "Unselect all"
               : someVisibleSelected
-              ? "Select all"
-              : "Select all"}
+                ? "Select all"
+                : "Select all"}
             {searchQuery && ` (${filteredFunctions.length} filtered)`}
           </Label>
         </div>
@@ -137,7 +143,9 @@ export function FunctionsSelector({
       {isLoading && (
         <div className="flex items-center justify-center py-8">
           <Loader2 className="h-6 w-6 animate-spin" />
-          <span className="ml-2 text-sm text-muted-foreground">Loading functions...</span>
+          <span className="ml-2 text-sm text-muted-foreground">
+            Loading functions...
+          </span>
         </div>
       )}
 
@@ -150,11 +158,17 @@ export function FunctionsSelector({
 
       {/* Functions List */}
       {!isLoading && !error && (
-        <ScrollArea className={noFixHeight ? "border rounded-md" : "h-64 border rounded-md"}>
+        <ScrollArea
+          className={
+            noFixHeight ? "border rounded-md" : "h-64 border rounded-md"
+          }
+        >
           <div className="p-4 space-y-3">
             {filteredFunctions.length === 0 ? (
               <div className="text-sm text-muted-foreground text-center py-8">
-                {searchQuery ? "No functions match your search" : "No functions available"}
+                {searchQuery
+                  ? "No functions match your search"
+                  : "No functions available"}
               </div>
             ) : (
               filteredFunctions.map((func) => (
@@ -173,7 +187,7 @@ export function FunctionsSelector({
                       htmlFor={func.name}
                       className="text-sm font-medium cursor-pointer"
                     >
-                      {func.name}
+                      {func.display_name}
                     </Label>
                     <p className="text-xs text-muted-foreground mt-1 break-words">
                       {func.description}
@@ -201,7 +215,8 @@ export function FunctionsSelector({
       {/* Selected Count */}
       {selectedFunctions.length > 0 && (
         <div className="text-xs text-muted-foreground">
-          {selectedFunctions.length} function{selectedFunctions.length !== 1 ? "s" : ""} selected
+          {selectedFunctions.length} function
+          {selectedFunctions.length !== 1 ? "s" : ""} selected
         </div>
       )}
     </div>
