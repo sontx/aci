@@ -94,10 +94,6 @@ export function AppSidebar() {
 
   return (
     <Sidebar variant="inset" collapsible="icon" className="flex flex-col">
-      <div className="w-full text-center py-1 text-xs font-bold flex items-center justify-center border-b-2 border-gray-200">
-        <AiOutlineRobot className="inline-block mr-2" />
-        In Beta
-      </div>
       <SidebarHeader>
         <div
           className={cn(
