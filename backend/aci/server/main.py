@@ -139,19 +139,18 @@ app.include_router(
     apps.router,
     prefix=config.ROUTER_PREFIX_APPS,
     tags=[config.ROUTER_PREFIX_APPS.split("/")[-1]],
-    dependencies=[Depends(deps.validate_api_key), Depends(deps.validate_project_quota)],
+    dependencies=[Depends(deps.validate_project_quota)],
 )
 app.include_router(
     functions.router,
     prefix=config.ROUTER_PREFIX_FUNCTIONS,
     tags=[config.ROUTER_PREFIX_FUNCTIONS.split("/")[-1]],
-    dependencies=[Depends(deps.validate_api_key), Depends(deps.validate_project_quota)],
+    dependencies=[Depends(deps.validate_project_quota)],
 )
 app.include_router(
     app_configurations.router,
     prefix=config.ROUTER_PREFIX_APP_CONFIGURATIONS,
     tags=[config.ROUTER_PREFIX_APP_CONFIGURATIONS.split("/")[-1]],
-    dependencies=[Depends(deps.validate_api_key)],
 )
 # TODO: project quota management for different routes
 # similar to auth, it contains a callback route so can't use global dependencies here

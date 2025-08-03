@@ -30,6 +30,7 @@ from aci.common.schemas.subscription import (
 )
 from aci.server import acl, billing, config
 from aci.server import dependencies as deps
+from aci.server.config import ACI_ORG_ID_HEADER
 
 router = APIRouter()
 logger = get_logger(__name__)
@@ -72,7 +73,7 @@ async def get_subscription(
 @router.get("/quota-usage", response_model=QuotaUsageResponse)
 async def get_quota_usage(
     db_session: Annotated[Session, Depends(deps.yield_db_session)],
-    org_id: Annotated[UUID, Header(alias="X-ACI-ORG-ID")],
+    org_id: Annotated[UUID, Header(alias=ACI_ORG_ID_HEADER)],
     user: Annotated[User, Depends(auth.require_user)],
 ) -> QuotaUsageResponse:
     acl.require_org_member(user, org_id)

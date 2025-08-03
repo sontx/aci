@@ -9,7 +9,7 @@ from aci.common.enums import APIKeyStatus
 class APIKeyPublic(BaseModel):
     id: UUID
     key: str
-    agent_id: UUID
+    project_id: UUID
     status: APIKeyStatus
 
     created_at: datetime

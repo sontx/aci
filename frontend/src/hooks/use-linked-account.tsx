@@ -10,10 +10,9 @@ import {
   updateLinkedAccount,
   getOauth2LinkURL,
 } from "@/lib/api/linkedaccount";
-import { useMetaInfo } from "@/components/context/metainfo";
-import { getApiKey } from "@/lib/api/util";
 import { LinkedAccount } from "@/lib/types/linkedaccount";
 import { toast } from "sonner";
+import { useMetaInfo } from "@/components/context/metainfo";
 
 export const linkedAccountKeys = {
   all: (projectId: string) => [projectId, "linkedaccounts"] as const,
@@ -21,11 +20,10 @@ export const linkedAccountKeys = {
 
 export const useLinkedAccounts = () => {
   const { activeProject } = useMetaInfo();
-  const apiKey = getApiKey(activeProject);
 
   return useQuery<LinkedAccount[], Error>({
     queryKey: linkedAccountKeys.all(activeProject.id),
-    queryFn: () => getAllLinkedAccounts(apiKey),
+    queryFn: () => getAllLinkedAccounts(),
   });
 };
 
@@ -52,7 +50,6 @@ type CreateAPILinkedAccountParams = {
 export const useCreateAPILinkedAccount = () => {
   const queryClient = useQueryClient();
   const { activeProject } = useMetaInfo();
-  const apiKey = getApiKey(activeProject);
 
   return useMutation<LinkedAccount, Error, CreateAPILinkedAccountParams>({
     mutationFn: (params) =>
@@ -60,7 +57,6 @@ export const useCreateAPILinkedAccount = () => {
         params.appName,
         params.linkedAccountOwnerId,
         params.linkedAPIKey,
-        apiKey,
       ),
 
     onSuccess: () =>
@@ -81,14 +77,12 @@ type CreateNoAuthLinkedAccountParams = {
 export const useCreateNoAuthLinkedAccount = () => {
   const queryClient = useQueryClient();
   const { activeProject } = useMetaInfo();
-  const apiKey = getApiKey(activeProject);
 
   return useMutation<LinkedAccount, Error, CreateNoAuthLinkedAccountParams>({
     mutationFn: (params) =>
       createNoAuthLinkedAccount(
         params.appName,
         params.linkedAccountOwnerId,
-        apiKey,
       ),
     onSuccess: () =>
       queryClient.invalidateQueries({
@@ -106,15 +100,11 @@ type GetOauth2LinkURLParams = {
 };
 
 export const useGetOauth2LinkURL = () => {
-  const { activeProject } = useMetaInfo();
-  const apiKey = getApiKey(activeProject);
-
   return useMutation<string, Error, GetOauth2LinkURLParams>({
     mutationFn: (params) =>
       getOauth2LinkURL(
         params.appName,
         params.linkedAccountOwnerId,
-        apiKey,
         params.afterOAuth2LinkRedirectURL,
       ),
     onError: (error) => {
@@ -130,10 +120,9 @@ type DeleteLinkedAccountParams = {
 export const useDeleteLinkedAccount = () => {
   const queryClient = useQueryClient();
   const { activeProject } = useMetaInfo();
-  const apiKey = getApiKey(activeProject);
 
   return useMutation<void, Error, DeleteLinkedAccountParams>({
-    mutationFn: (params) => deleteLinkedAccount(params.linkedAccountId, apiKey),
+    mutationFn: (params) => deleteLinkedAccount(params.linkedAccountId),
     onSuccess: () =>
       queryClient.invalidateQueries({
         queryKey: linkedAccountKeys.all(activeProject.id),
@@ -149,11 +138,10 @@ type UpdateLinkedAccountParams = {
 export const useUpdateLinkedAccount = () => {
   const queryClient = useQueryClient();
   const { activeProject } = useMetaInfo();
-  const apiKey = getApiKey(activeProject);
 
   return useMutation<LinkedAccount, Error, UpdateLinkedAccountParams>({
     mutationFn: (params) =>
-      updateLinkedAccount(params.linkedAccountId, apiKey, params.enabled),
+      updateLinkedAccount(params.linkedAccountId, params.enabled),
     onSuccess: () =>
       queryClient.invalidateQueries({
         queryKey: linkedAccountKeys.all(activeProject.id),

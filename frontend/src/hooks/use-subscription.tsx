@@ -1,14 +1,13 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { getSubscription } from "../lib/api/billing";
-import { useMetaInfo } from "@/components/context/metainfo";
+import { getSubscription } from "@/lib/api/billing";
+import { getStorageActiveOrgId } from "@/lib/utils";
 
 export const useSubscription = () => {
-  const { accessToken, activeOrg } = useMetaInfo();
-
+  const orgId = getStorageActiveOrgId();
   return useQuery({
-    queryKey: ["subscription", activeOrg.orgId],
-    queryFn: () => getSubscription(accessToken, activeOrg.orgId),
+    queryKey: ["subscription", orgId],
+    queryFn: () => getSubscription(),
   });
 };

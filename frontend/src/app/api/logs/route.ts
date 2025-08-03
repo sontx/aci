@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
 
   // Verify organization ID and project ID exist and user has access
   try {
-    const projects = await getProjects(propelAuthToken, orgId);
+    const projects = await getProjects();
     const hasAccess = projects.some((p) => p.id === projectId);
     if (!hasAccess) {
       return NextResponse.json(

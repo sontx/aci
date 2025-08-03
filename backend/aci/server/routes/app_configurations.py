@@ -24,8 +24,6 @@ from aci.server import dependencies as deps
 router = APIRouter()
 logger = get_logger(__name__)
 
-
-# TODO: when creating an app configuration, allow user to specify list of agents that are allowed to access the app
 @router.post("", response_model=AppConfigurationPublic, response_model_exclude_none=True)
 async def create_app_configuration(
     context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
@@ -138,10 +136,8 @@ async def delete_app_configuration(
         context.db_session, context.project.id, app_name
     )
 
-    # 3. delete this App from all agents' allowed_apps if exists
-    crud.projects.delete_app_from_agents_allowed_apps(
-        context.db_session, context.project.id, app_name
-    )
+    # 3. delete all MCP servers associated with this app configuration
+    crud.mcp_servers.delete_mcp_servers_by_app_config(db_session=context.db_session, app_config_id=app_configuration.id)
 
     context.db_session.commit()
 

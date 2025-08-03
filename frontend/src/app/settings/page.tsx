@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { createCustomerPortalSession } from "@/lib/api/billing";
 import { useSubscription } from "@/hooks/use-subscription";
 import { useLogoutFunction } from "@propelauth/react";
-import { User, Mail, LogOut } from "lucide-react";
+import { LogOut, Mail, User } from "lucide-react";
 import { updateProject } from "@/lib/api/project";
 import { toast } from "sonner";
 import { SettingsSection } from "@/components/settings/settings-section";
@@ -16,8 +16,7 @@ import { DangerZone } from "@/components/settings/danger-zone";
 import { OrgMembersTable } from "@/components/settings/org-members-table";
 
 export default function SettingsPage() {
-  const { user, activeOrg, accessToken, activeProject, reloadActiveProject } =
-    useMetaInfo();
+  const { user, activeOrg, activeProject, reloadActiveProject } = useMetaInfo();
   const logoutFn = useLogoutFunction();
   const { data: subscription, isLoading } = useSubscription();
 
@@ -28,7 +27,7 @@ export default function SettingsPage() {
     }
 
     try {
-      await updateProject(accessToken, activeProject.id, newName);
+      await updateProject(activeProject.id, newName);
       await reloadActiveProject();
       toast.success("Project name updated");
     } catch (error) {
@@ -102,11 +101,7 @@ export default function SettingsPage() {
             subscription={subscription}
             isLoading={isLoading}
             onManageSubscription={async () => {
-              const url = await createCustomerPortalSession(
-                accessToken,
-                activeOrg.orgId,
-              );
-              window.location.href = url;
+              window.location.href = await createCustomerPortalSession();
             }}
           />
           <OrgMembersTable />

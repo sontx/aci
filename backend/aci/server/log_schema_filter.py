@@ -46,7 +46,6 @@ _ALLOWED_CUSTOM_LOG_FIELDS = [
     "user_agent",
     "x_forwarded_proto",
     "request_id",
-    "agent_id",
     "org_id",
     "api_key_id",
     "project_id",

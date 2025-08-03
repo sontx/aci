@@ -237,19 +237,6 @@ class MaxProjectsReached(ACIException):
         )
 
 
-class MaxAgentsReached(ACIException):
-    """
-    Exception raised when a project has reached the maximum number of agents
-    """
-
-    def __init__(self, message: str | None = None):
-        super().__init__(
-            title="Max agents reached",
-            message=message,
-            error_code=status.HTTP_403_FORBIDDEN,
-        )
-
-
 class UserNotFound(ACIException):
     """
     Exception raised when a user is not found
@@ -336,32 +323,6 @@ class LinkedAccountDisabled(ACIException):
             title="Linked account disabled",
             message=message,
             error_code=status.HTTP_403_FORBIDDEN,
-        )
-
-
-class AgentNotFound(ACIException):
-    """
-    Exception raised when an agent is not found
-    """
-
-    def __init__(self, message: str | None = None):
-        super().__init__(
-            title="Agent not found",
-            message=message,
-            error_code=status.HTTP_404_NOT_FOUND,
-        )
-
-
-class AppNotAllowedForThisAgent(ACIException):
-    """
-    Exception raised when an app is not allowed to be used by an agent
-    """
-
-    def __init__(self, message: str | None = None):
-        super().__init__(
-            title="App not allowed for this agent",
-            message=message,
-            error_code=status.HTTP_401_UNAUTHORIZED,
         )
 
 

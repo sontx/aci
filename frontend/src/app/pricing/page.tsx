@@ -99,7 +99,6 @@ const tiers = [
 
 export default function PricingPage() {
   const { data: subscription } = useSubscription();
-  const { accessToken, activeOrg } = useMetaInfo();
   const [isYearly, setIsYearly] = useState(false);
   const router = useRouter();
 
@@ -225,13 +224,10 @@ export default function PricingPage() {
                       return;
                     }
 
-                    const url = await createCheckoutSession(
-                      accessToken,
-                      activeOrg.orgId,
+                    window.location.href = await createCheckoutSession(
                       tier.name,
                       isYearly ? Interval.Year : Interval.Month,
                     );
-                    window.location.href = url;
                   }}
                 >
                   {subscription?.plan === tier.name ? (

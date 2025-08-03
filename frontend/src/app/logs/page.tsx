@@ -45,7 +45,7 @@ const useLogsTable = () => {
     );
   const pageSize = PAGE_SIZE;
 
-  const { activeProject, accessToken, activeOrg } = useMetaInfo();
+  const { activeProject } = useMetaInfo();
 
   const setDateRangeAndOption = (
     option: DashboardDateRangeOptions,
@@ -84,8 +84,6 @@ const useLogsTable = () => {
           ...(nextPageCursor && { cursor: nextPageCursor }),
           ...(activeProject && { project_id: activeProject.id }),
         },
-        activeOrg?.orgId,
-        accessToken,
       );
     },
     refetchOnWindowFocus: false,

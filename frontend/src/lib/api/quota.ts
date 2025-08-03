@@ -1,23 +1,7 @@
 import { QuotaUsage } from "@/lib/types/quota";
+import axiosInstance from "@/lib/axios";
 
-export async function getQuotaUsage(
-  accessToken: string,
-  orgId: string,
-): Promise<QuotaUsage> {
-  const response = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL}/v1/billing/quota-usage`,
-    {
-      method: "GET",
-      headers: {
-        "X-ACI-ORG-ID": orgId,
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
-      },
-    },
-  );
-
-  if (!response.ok) {
-    throw new Error(`Failed to get quota usage. Status: ${response.status}`);
-  }
-  return response.json();
+export async function getQuotaUsage(): Promise<QuotaUsage> {
+  const response = await axiosInstance.get("/v1/billing/quota-usage");
+  return response.data;
 }

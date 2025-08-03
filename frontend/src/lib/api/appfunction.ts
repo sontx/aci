@@ -4,40 +4,30 @@ import {
   FunctionExecutionResult,
   FunctionsSearchParams,
 } from "@/lib/types/appfunction";
+import axiosInstance from "@/lib/axios";
+import { AxiosError } from "axios";
 
 export async function executeFunction(
   functionName: string,
   body: FunctionExecute,
-  apiKey: string,
 ): Promise<FunctionExecutionResult> {
-  const response = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL}/v1/functions/${functionName}/execute`,
-    {
-      method: "POST",
-      headers: {
-        "X-API-KEY": apiKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    },
-  );
+  try {
+    const response = await axiosInstance.post(
+      `/v1/functions/${functionName}/execute`,
+      body
+    );
 
-  if (!response.ok) {
+    return response.data;
+  } catch (error) {
     return {
       success: false,
       data: {},
-      error: (await response.json()).error,
+      error: error instanceof AxiosError ? error.response?.data?.error || error.message : String(error),
     };
   }
-
-  const result = await response.json();
-  return result;
 }
 
-export async function searchFunctions(
-  params: FunctionsSearchParams,
-  apiKey: string,
-): Promise<AppFunction[]> {
+export async function searchFunctions(params: FunctionsSearchParams): Promise<AppFunction[]> {
   const searchParams = new URLSearchParams();
 
   if (params.app_names?.length) {
@@ -59,45 +49,17 @@ export async function searchFunctions(
     searchParams.append("offset", params.offset.toString());
   }
 
-  const response = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL}/v1/functions/search?${searchParams.toString()}`,
-    {
-      method: "GET",
-      headers: {
-        "X-API-KEY": apiKey,
-      },
-    },
+  const response = await axiosInstance.get(
+    `/v1/functions/search?${searchParams.toString()}`
   );
 
-  if (!response.ok) {
-    throw new Error(
-      `Failed to search functions: ${response.status} ${response.statusText}`,
-    );
-  }
-
-  const functions = await response.json();
-  return functions;
+  return response.data;
 }
 
-export async function getAppFunction(
-  name: string,
-  apiKey: string,
-): Promise<AppFunction> {
-  const response = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL}/v1/functions/${name}/definition?format=raw`,
-    {
-      method: "GET",
-      headers: {
-        "X-API-KEY": apiKey,
-      },
-    },
+export async function getAppFunction(name: string): Promise<AppFunction> {
+  const response = await axiosInstance.get(
+    `/v1/functions/${name}/definition?format=raw`
   );
 
-  if (!response.ok) {
-    throw new Error(
-      `Failed to fetch app function: ${response.status} ${response.statusText}`,
-    );
-  }
-
-  return await response.json();
+  return response.data;
 }

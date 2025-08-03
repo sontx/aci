@@ -4,7 +4,6 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from aci.common.enums import Visibility
-from aci.common.schemas.agent import AgentPublic
 
 
 class ProjectCreate(BaseModel):
@@ -35,7 +34,5 @@ class ProjectPublic(BaseModel):
 
     created_at: datetime
     updated_at: datetime
-
-    agents: list[AgentPublic]
 
     model_config = ConfigDict(from_attributes=True)

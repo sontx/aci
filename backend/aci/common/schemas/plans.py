@@ -12,7 +12,6 @@ class PlanType(Enum):
 class PlanFeatures(BaseModel):
     linked_accounts: int
     api_calls_monthly: int
-    agent_credentials: int
     developer_seats: int
     custom_oauth: bool
     log_retention_days: int

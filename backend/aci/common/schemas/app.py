@@ -73,7 +73,7 @@ class AppsSearch(BaseModel):
     )
     allowed_apps_only: bool = Field(
         default=False,
-        description="If true, only return apps that are allowed by the agent/accessor, identified by the api key.",
+        description="If true, only return apps that are allowed by the accessor, identified by the api key.",
     )
     categories: list[str] | None = Field(
         default=None, description="List of categories for filtering."

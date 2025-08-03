@@ -37,6 +37,7 @@ dependencies = [
     "mcp>=1.12.0",
     "gunicorn>=23.0.0",
     "jsonref>=1.1.0",
+    "propelauth-py>=4.2.6",
 ]
 
 [dependency-groups]

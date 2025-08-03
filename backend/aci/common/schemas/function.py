@@ -104,10 +104,6 @@ class FunctionsSearch(BaseModel):
         default=None,
         description="Natural language intent for vector similarity sorting. Results will be sorted by relevance to the intent.",
     )
-    allowed_apps_only: bool = Field(
-        default=False,
-        description="If true, only returns functions of apps that are allowed by the agent/accessor, identified by the api key.",
-    )
     format: FunctionDefinitionFormat = Field(
         default=FunctionDefinitionFormat.BASIC,
         description="The format of the function definition to return. e.g., 'openai', 'anthropic' or 'basic' which only returns name and description.",

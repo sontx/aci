@@ -1,6 +1,6 @@
 """
-CRUD operations for projects, including direct entities under a project such as agents and API keys.
-TODO: function todelete project and all related data (app_configurations, agents, api_keys, etc.)
+CRUD operations for projects, including direct entities under a project such as API keys.
+TODO: function todelete project and all related data (app_configurations, api_keys, etc.)
 """
 
 import secrets
@@ -11,20 +11,19 @@ from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from aci.common import encryption
-from aci.common.db.sql_models import Agent, APIKey, Project
+from aci.common.db.sql_models import APIKey, Project
 from aci.common.enums import APIKeyStatus, Visibility
 from aci.common.logging_setup import get_logger
-from aci.common.schemas.agent import AgentUpdate, ValidInstruction
 from aci.common.schemas.project import ProjectUpdate
 
 logger = get_logger(__name__)
 
 
 def create_project(
-    db_session: Session,
-    org_id: UUID,
-    name: str,
-    visibility_access: Visibility = Visibility.PUBLIC,
+        db_session: Session,
+        org_id: UUID,
+        name: str,
+        visibility_access: Visibility = Visibility.PUBLIC,
 ) -> Project:
     project = Project(
         org_id=org_id,
@@ -39,8 +38,8 @@ def create_project(
 
 def project_exists(db_session: Session, project_id: UUID) -> bool:
     return (
-        db_session.execute(select(Project).filter_by(id=project_id)).scalar_one_or_none()
-        is not None
+            db_session.execute(select(Project).filter_by(id=project_id)).scalar_one_or_none()
+            is not None
     )
 
 
@@ -60,15 +59,8 @@ def get_projects_by_org(db_session: Session, org_id: UUID) -> list[Project]:
 
 
 def get_project_by_api_key_id(db_session: Session, api_key_id: UUID) -> Project | None:
-    # api key id -> agent id -> project id
-    project: Project | None = db_session.execute(
-        select(Project)
-        .join(Agent, Project.id == Agent.project_id)
-        .join(APIKey, Agent.id == APIKey.agent_id)
-        .filter(APIKey.id == api_key_id)
-    ).scalar_one_or_none()
-
-    return project
+    api_key = db_session.execute(select(APIKey).filter(APIKey.id == api_key_id)).scalar_one_or_none()
+    return api_key.project if api_key else None
 
 
 def delete_project(db_session: Session, project_id: UUID) -> None:
@@ -84,7 +76,7 @@ def delete_project(db_session: Session, project_id: UUID) -> None:
 
 
 def set_project_visibility_access(
-    db_session: Session, project_id: UUID, visibility_access: Visibility
+        db_session: Session, project_id: UUID, visibility_access: Visibility
 ) -> None:
     statement = update(Project).filter_by(id=project_id).values(visibility_access=visibility_access)
     db_session.execute(statement)
@@ -125,7 +117,7 @@ def increase_project_quota_usage(db_session: Session, project: Project) -> None:
 
 
 def increment_api_monthly_quota_usage(
-    db_session: Session, project: Project, monthly_quota_limit: int
+        db_session: Session, project: Project, monthly_quota_limit: int
 ) -> bool:
     """
     Atomically increment API monthly quota usage for a project only if the total org usage
@@ -168,7 +160,7 @@ def increment_api_monthly_quota_usage(
 
 
 def reset_api_monthly_quota_for_org(
-    db_session: Session, org_id: UUID, reset_date: datetime
+        db_session: Session, org_id: UUID, reset_date: datetime
 ) -> None:
     """Reset api monthly quota for all projects in an organization"""
     statement = (
@@ -194,146 +186,25 @@ def get_total_monthly_quota_usage_for_org(db_session: Session, org_id: UUID) -> 
     return result or 0
 
 
-def create_agent(
-    db_session: Session,
-    project_id: UUID,
-    name: str,
-    description: str,
-    allowed_apps: list[str],
-    custom_instructions: dict[str, ValidInstruction],
-) -> Agent:
-    """
-    Create a new agent under a project, and create a new API key for the agent.
-    """
-    # Create the agent
-    agent = Agent(
-        project_id=project_id,
-        name=name,
-        description=description,
-        allowed_apps=allowed_apps,
-        custom_instructions=custom_instructions,
-    )
-    db_session.add(agent)
-
-    key = secrets.token_hex(32)
-    key_hmac = encryption.hmac_sha256(key)
-
-    # Create the API key for the agent
-    api_key = APIKey(key=key, key_hmac=key_hmac, agent_id=agent.id, status=APIKeyStatus.ACTIVE)
-    db_session.add(api_key)
-
-    db_session.flush()
-    db_session.refresh(agent)
-
-    return agent
-
-
-def update_agent(
-    db_session: Session,
-    agent: Agent,
-    update: AgentUpdate,
-) -> Agent:
-    """
-    Update Agent record by agent id
-    """
-
-    if update.name is not None:
-        agent.name = update.name
-    if update.description is not None:
-        agent.description = update.description
-    if update.allowed_apps is not None:
-        agent.allowed_apps = update.allowed_apps
-    if update.custom_instructions is not None:
-        agent.custom_instructions = update.custom_instructions
-
-    db_session.flush()
-    db_session.refresh(agent)
-
-    return agent
-
-
-def delete_agent(db_session: Session, agent: Agent) -> None:
-    db_session.delete(agent)
-    db_session.flush()
-
-
-def delete_app_from_agents_allowed_apps(
-    db_session: Session, project_id: UUID, app_name: str
-) -> None:
-    statement = (
-        update(Agent)
-        .where(Agent.project_id == project_id)
-        .values(allowed_apps=func.array_remove(Agent.allowed_apps, app_name))
-    )
-    db_session.execute(statement)
-
-
-def get_agents_by_project(db_session: Session, project_id: UUID) -> list[Agent]:
-    return list(db_session.execute(select(Agent).filter_by(project_id=project_id)).scalars().all())
-
-
-def get_agent_by_id(db_session: Session, agent_id: UUID) -> Agent | None:
-    return db_session.execute(select(Agent).filter_by(id=agent_id)).scalar_one_or_none()
-
-
-def get_agent_by_api_key_id(db_session: Session, api_key_id: UUID) -> Agent | None:
-    return db_session.execute(
-        select(Agent).join(APIKey, Agent.id == APIKey.agent_id).filter(APIKey.id == str(api_key_id))
-    ).scalar_one_or_none()
-
-
-def get_agents_whose_allowed_apps_contains(db_session: Session, app_name: str) -> list[Agent]:
-    statement = select(Agent).where(Agent.allowed_apps.contains([app_name]))
-    return list(db_session.execute(statement).scalars().all())
-
-
-def get_api_key_by_agent_id(db_session: Session, agent_id: UUID) -> APIKey | None:
-    return db_session.execute(select(APIKey).filter_by(agent_id=agent_id)).scalar_one_or_none()
-
-
 def get_api_key(db_session: Session, key: str) -> APIKey | None:
     key_hmac = encryption.hmac_sha256(key)
     return db_session.execute(select(APIKey).filter_by(key_hmac=key_hmac)).scalar_one_or_none()
 
 
-def get_request_context_by_api_key(
-    db_session: Session, key: str
-) -> tuple[UUID | None, UUID | None, UUID | None, UUID | None]:
-    """
-    Get project_id, agent_id, api_key_id, and org_id in a single query given an API key string.
-    Returns a tuple of (api_key_id, agent_id, project_id, org_id) - any of which can be None if not found.
-    """
-    key_hmac = encryption.hmac_sha256(key)
-
-    result = db_session.execute(
-        select(APIKey.id, Agent.id, Project.id, Project.org_id)
-        .join(Agent, APIKey.agent_id == Agent.id, isouter=True)
-        .join(Project, Agent.project_id == Project.id, isouter=True)
-        .filter(APIKey.key_hmac == key_hmac)
-    ).first()
-
-    if not result:
-        return None, None, None, None
-
-    api_key_id, agent_id, project_id, org_id = result
-    return api_key_id, agent_id, project_id, org_id
-
-
 def get_all_api_key_ids_for_project(db_session: Session, project_id: UUID) -> list[UUID]:
-    agents = get_agents_by_project(db_session, project_id)
-    project_api_key_ids = []
-    for agent in agents:
-        api_key = get_api_key_by_agent_id(db_session, agent.id)
-        if api_key:
-            project_api_key_ids.append(api_key.id)
-
-    return project_api_key_ids
+    """
+    Get all API key IDs for a project.
+    """
+    api_keys = db_session.execute(
+        select(APIKey.id).filter_by(project_id=project_id)
+    ).scalars().all()
+    return list(api_keys)
 
 
 def update_project(
-    db_session: Session,
-    project: Project,
-    update: ProjectUpdate,
+        db_session: Session,
+        project: Project,
+        update: ProjectUpdate,
 ) -> Project:
     """
     Update Project record

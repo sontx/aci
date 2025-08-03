@@ -6,12 +6,9 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
-from aci.common import utils
-from aci.common.db import crud
 from aci.common.logging_setup import get_logger
 from aci.server import config
 from aci.server.context import (
-    agent_id_ctx_var,
     api_key_id_ctx_var,
     org_id_ctx_var,
     project_id_ctx_var,
@@ -36,35 +33,16 @@ class InterceptorMiddleware(BaseHTTPMiddleware):
 
         # Get request context from x-api-key header
         api_key = request.headers.get(config.ACI_API_KEY_HEADER)
-        api_key_id = agent_id = project_id = org_id = None
-        if api_key:
-            logger.info(f"API key found in header, api_key={api_key[:4] + '...' + api_key[-4:]}")
-            try:
-                with utils.create_db_session(config.DB_FULL_URL) as db_session:
-                    api_key_id, agent_id, project_id, org_id = (
-                        crud.projects.get_request_context_by_api_key(db_session, api_key)
-                    )
-                    if not api_key_id and not agent_id and not project_id and not org_id:
-                        logger.warning(
-                            f"API key not found in db, api_key={api_key[:4] + '...' + api_key[-4:]}"
-                        )
-                        return JSONResponse(
-                            status_code=401,
-                            content={"error": "Unauthorized"},
-                        )
-                    context_vars = {
-                        api_key_id_ctx_var: api_key_id,
-                        agent_id_ctx_var: agent_id,
-                        project_id_ctx_var: project_id,
-                        org_id_ctx_var: org_id,
-                    }
-                    for var, value in context_vars.items():
-                        var.set(str(value) if value else "unknown")
+        project_id = request.headers.get(config.ACI_PROJECT_ID_HEADER)
+        org_id = request.headers.get(config.ACI_ORG_ID_HEADER)
 
-            except Exception as e:
-                logger.exception(
-                    f"Can't access database to query request context for API key, error={e}"
-                )
+        context_vars = {
+            api_key_id_ctx_var: api_key,
+            project_id_ctx_var: project_id,
+            org_id_ctx_var: org_id,
+        }
+        for var, value in context_vars.items():
+            var.set(str(value) if value else None)
 
         # Skip logging for health check endpoints
         is_health_check = request.url.path == config.ROUTER_PREFIX_HEALTH
@@ -154,14 +132,8 @@ class RequestContextFilter(logging.Filter):
         request_id = request_id_ctx_var.get()
         record.__dict__["request_id"] = request_id
 
-        api_key_id = api_key_id_ctx_var.get()
-        record.__dict__["api_key_id"] = api_key_id
-
         project_id = project_id_ctx_var.get()
         record.__dict__["project_id"] = project_id
-
-        agent_id = agent_id_ctx_var.get()
-        record.__dict__["agent_id"] = agent_id
 
         org_id = org_id_ctx_var.get()
         record.__dict__["org_id"] = org_id

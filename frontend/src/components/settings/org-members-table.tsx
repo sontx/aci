@@ -1,10 +1,10 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { EnhancedDataTable } from "@/components/ui-extensions/enhanced-data-table/data-table";
-import { useOrgMembersTableColumns } from "../../hooks/use-org-members-table-columns";
-import { OrganizationUser, OrganizationRole } from "@/lib/types/organization";
+import { useOrgMembersTableColumns } from "@/hooks/use-org-members-table-columns";
+import { OrganizationRole, OrganizationUser } from "@/lib/types/organization";
 import {
-  listOrganizationUsers,
   inviteToOrganization,
+  listOrganizationUsers,
   removeUser,
 } from "@/lib/api/organization";
 import { useMetaInfo } from "@/components/context/metainfo";
@@ -13,13 +13,13 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import {
   Dialog,
-  DialogTrigger,
+  DialogClose,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
-  DialogClose,
-  DialogDescription,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -33,7 +33,7 @@ import { useRouter } from "next/navigation";
 import { useAuthInfo } from "@propelauth/react";
 
 export function OrgMembersTable() {
-  const { accessToken, activeOrg, user } = useMetaInfo();
+  const { activeOrg, user } = useMetaInfo();
   const { refreshAuthInfo } = useAuthInfo();
   const router = useRouter();
   const [members, setMembers] = useState<OrganizationUser[]>([]);
@@ -53,13 +53,13 @@ export function OrgMembersTable() {
   const fetchMembers = useMemo(
     () => async () => {
       try {
-        const data = await listOrganizationUsers(accessToken, activeOrg.orgId);
+        const data = await listOrganizationUsers();
         setMembers(data);
       } catch {
         toast.error("Failed to load organization members");
       }
     },
-    [accessToken, activeOrg.orgId],
+    [activeOrg.orgId],
   );
 
   useEffect(() => {
@@ -70,12 +70,7 @@ export function OrgMembersTable() {
     if (!inviteEmail) return;
     setInviting(true);
     try {
-      await inviteToOrganization(
-        accessToken,
-        activeOrg.orgId,
-        inviteEmail,
-        inviteRole,
-      );
+      await inviteToOrganization(inviteEmail, inviteRole);
       toast.success("Invitation sent");
       setInviteEmail("");
       setOpen(false);
@@ -89,7 +84,7 @@ export function OrgMembersTable() {
 
   const handleRemove = async (userId: string) => {
     try {
-      await removeUser(accessToken, activeOrg.orgId, userId);
+      await removeUser(userId);
       toast.success("Member removed");
       fetchMembers();
 

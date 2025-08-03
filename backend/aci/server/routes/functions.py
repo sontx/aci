@@ -70,17 +70,10 @@ async def search_functions(
     # TODO: currently the search is done across all apps, we might want to add flags to account for below scenarios:
     # - when clients search for functions, if the app of the functions is configured but disabled by client, should the functions be discoverable?
 
-    # get the apps to filter (or not) based on the allowed_apps_only and app_names query params
-    if query_params.allowed_apps_only:
-        if query_params.app_names is None:
-            apps_to_filter = context.agent.allowed_apps
-        else:
-            apps_to_filter = list(set(query_params.app_names) & set(context.agent.allowed_apps))
+    if query_params.app_names is None:
+        apps_to_filter = None
     else:
-        if query_params.app_names is None:
-            apps_to_filter = None
-        else:
-            apps_to_filter = query_params.app_names
+        apps_to_filter = query_params.app_names
 
     functions = crud.functions.search_functions(
         context.db_session,
@@ -236,7 +229,6 @@ async def execute_function(
     Args:
         db_session: Database session
         project: Project object
-        agent: Agent object
         function_name: Name of the function to execute
         function_input: Input parameters for the function
         linked_account_owner_id: ID of the linked account owner
@@ -248,7 +240,6 @@ async def execute_function(
         FunctionNotFound: If the function is not found
         AppConfigurationNotFound: If the app configuration is not found
         AppConfigurationDisabled: If the app configuration is disabled
-        AppNotAllowedForThisAgent: If the app is not allowed for the agent
         LinkedAccountNotFound: If the linked account is not found
         LinkedAccountDisabled: If the linked account is disabled
     """

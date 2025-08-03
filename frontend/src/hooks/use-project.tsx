@@ -11,6 +11,7 @@ import {
 import { Project } from "@/lib/types/project";
 import { toast } from "sonner";
 import { useMetaInfo } from "@/components/context/metainfo";
+
 export const projectKeys = {
   all: (orgId: string) => ["projects", orgId] as const,
   detail: (orgId: string, projectId: string) =>
@@ -21,7 +22,7 @@ export const useProjects = (orgId?: string, accessToken?: string) => {
   return useQuery<Project[], Error>({
     queryKey: orgId ? projectKeys.all(orgId) : ["projects"],
     queryFn: async () => {
-      const fetchedProjects = await getProjects(accessToken!, orgId!);
+      const fetchedProjects = await getProjects();
 
       return [...fetchedProjects].sort((a, b) => {
         return (
@@ -51,10 +52,10 @@ type CreateProjectParams = {
 
 export const useCreateProject = () => {
   const queryClient = useQueryClient();
-  const { activeOrg, accessToken } = useMetaInfo();
+  const { activeOrg } = useMetaInfo();
   return useMutation<Project, Error, CreateProjectParams>({
     mutationFn: (params) =>
-      createProject(accessToken, params.name, activeOrg.orgId),
+      createProject(params.name, activeOrg.orgId),
     onSuccess: (newProject) => {
       queryClient.setQueryData<Project[]>(
         projectKeys.all(activeOrg.orgId),
@@ -81,11 +82,11 @@ type UpdateProjectParams = {
 
 export const useUpdateProject = () => {
   const queryClient = useQueryClient();
-  const { activeProject, accessToken, activeOrg } = useMetaInfo();
+  const { activeProject, activeOrg } = useMetaInfo();
 
   return useMutation<Project, Error, UpdateProjectParams>({
     mutationFn: (params) =>
-      updateProject(accessToken, activeProject.id, params.name),
+      updateProject(activeProject.id, params.name),
     onSuccess: (updatedProject) => {
       queryClient.setQueryData<Project[]>(
         projectKeys.all(activeOrg.orgId),
@@ -111,9 +112,9 @@ export const useUpdateProject = () => {
 
 export const useDeleteProject = () => {
   const queryClient = useQueryClient();
-  const { activeProject, accessToken, activeOrg } = useMetaInfo();
+  const { activeProject, activeOrg } = useMetaInfo();
   return useMutation<void, Error>({
-    mutationFn: () => deleteProject(accessToken, activeProject.id),
+    mutationFn: () => deleteProject(activeProject.id),
     onSuccess: () => {
       queryClient.setQueryData<Project[]>(
         projectKeys.all(activeOrg.orgId),

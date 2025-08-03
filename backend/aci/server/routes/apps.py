@@ -69,20 +69,15 @@ async def search_apps(
 ) -> list[AppBasic]:
     """
     Search for Apps.
-    Intented to be used by agents to search for apps based on natural language intent.
     """
     # TODO: currently the search is done across all apps, we might want to add flags to account for below scenarios:
     # - when clients search for apps, if an app is configured but disabled by client, should it be discoverable?
-
-    # if the search is restricted to allowed apps, we need to filter the apps by the agent's allowed apps.
-    # None means no filtering
-    apps_to_filter = context.agent.allowed_apps if query_params.allowed_apps_only else None
 
     apps_with_scores = crud.apps.search_apps(
         context.db_session,
         context.project.visibility_access == Visibility.PUBLIC,
         True,
-        apps_to_filter,
+        None,
         query_params.categories,
         query_params.limit,
         query_params.offset,

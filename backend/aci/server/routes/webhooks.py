@@ -104,23 +104,13 @@ async def handle_user_created_webhook(
     org_id_uuid = _convert_org_id_to_uuid(org.org_id)
     project = crud.projects.create_project(db_session, org_id_uuid, "Default Project")
 
-    # Create a default Agent for the project
-    agent = crud.projects.create_agent(
-        db_session,
-        project.id,
-        name="Default Agent",
-        description="Default Agent",
-        allowed_apps=[],
-        custom_instructions={},
-    )
     db_session.commit()
 
     logger.info(
-        f"Created default project and agent for new user, "
+        f"Created default project for new user, "
         f"user_id={user.user_id}, "
         f"org_id={org.org_id} "
-        f"project_id={project.id} "
-        f"agent_id={agent.id}"
+        f"project_id={project.id}"
     )
 
 

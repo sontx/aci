@@ -1,6 +1,4 @@
-import { useMetaInfo } from "@/components/context/metainfo";
 import { getAllApps } from "@/lib/api/app";
-import { getApiKey } from "@/lib/api/util";
 import { useQuery } from "@tanstack/react-query";
 import { App } from "@/lib/types/app";
 import { useMemo } from "react";
@@ -10,12 +8,9 @@ export const appKeys = {
 };
 
 export function useApps(appNames?: string[]) {
-  const { activeProject } = useMetaInfo();
-  const apiKey = getApiKey(activeProject);
-
   return useQuery({
     queryKey: appKeys.all,
-    queryFn: () => getAllApps(apiKey),
+    queryFn: () => getAllApps(),
     select: (data) => {
       if (!appNames || appNames.length === 0) {
         return data;

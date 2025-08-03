@@ -18,6 +18,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { UserClass } from "@propelauth/javascript";
 import { useProjects, useReloadProjects } from "@/hooks/use-project";
 import { useOrgs } from "@/hooks/use-org";
+import {
+  ACCESS_TOKEN_KEY,
+  ACTIVE_ORG_ID_KEY,
+  ACTIVE_PROJECT_ID_PREFIX_KEY,
+} from "@/lib/constants";
 
 interface MetaInfoContextType {
   user: UserClass;
@@ -54,10 +59,27 @@ export const MetaInfoProvider = withRequiredAuthInfo<MetaInfoProviderProps>(
     );
     const reloadProjectsFunc = useReloadProjects();
 
+    // Save access token to local storage
+    useEffect(() => {
+      if (accessToken) {
+        localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+      } else {
+        localStorage.removeItem(ACCESS_TOKEN_KEY);
+      }
+    }, [accessToken]);
+
+    useEffect(() => {
+      if (activeOrg) {
+        localStorage.setItem(ACTIVE_ORG_ID_KEY, activeOrg.orgId);
+      } else {
+        localStorage.removeItem(ACTIVE_ORG_ID_KEY);
+      }
+    }, [activeOrg]);
+
     useEffect(() => {
       if (orgs.length > 0) {
         // Get active org from local storage
-        const savedOrgId = localStorage.getItem("activeOrgId");
+        const savedOrgId = localStorage.getItem(ACTIVE_ORG_ID_KEY);
         const savedOrg = savedOrgId
           ? orgs.find((org) => org.orgId === savedOrgId)
           : null;
@@ -69,7 +91,7 @@ export const MetaInfoProvider = withRequiredAuthInfo<MetaInfoProviderProps>(
     useEffect(() => {
       if (projects.length > 0) {
         const savedProjectId = localStorage.getItem(
-          `activeProject_${activeOrg?.orgId}`,
+          `${ACTIVE_PROJECT_ID_PREFIX_KEY}${activeOrg?.orgId}`,
         );
         const savedProject = savedProjectId
           ? projects.find((p) => p.id === savedProjectId)
@@ -82,7 +104,7 @@ export const MetaInfoProvider = withRequiredAuthInfo<MetaInfoProviderProps>(
     useEffect(() => {
       if (activeProject && activeOrg) {
         localStorage.setItem(
-          `activeProject_${activeOrg.orgId}`,
+          `${ACTIVE_PROJECT_ID_PREFIX_KEY}${activeOrg.orgId}`,
           activeProject.id,
         );
       }
@@ -90,13 +112,15 @@ export const MetaInfoProvider = withRequiredAuthInfo<MetaInfoProviderProps>(
 
     useEffect(() => {
       if (activeOrg) {
-        localStorage.setItem("activeOrgId", activeOrg.orgId);
+        localStorage.setItem(ACTIVE_ORG_ID_KEY, activeOrg.orgId);
+      } else {
+        localStorage.removeItem(ACTIVE_ORG_ID_KEY);
       }
     }, [activeOrg]);
 
     const handleSetActiveOrg = useCallback((org: OrgMemberInfoClass) => {
       setActiveOrg(org);
-      localStorage.setItem("activeOrgId", org.orgId);
+      localStorage.setItem(ACTIVE_ORG_ID_KEY, org.orgId);
     }, []);
 
     const reloadActiveProject = useCallback(async () => {
@@ -107,7 +131,11 @@ export const MetaInfoProvider = withRequiredAuthInfo<MetaInfoProviderProps>(
 
     return (
       <div>
-        {activeOrg && activeProject && accessToken && !projectsLoading && !orgsLoading ? (
+        {activeOrg &&
+        activeProject &&
+        accessToken &&
+        !projectsLoading &&
+        !orgsLoading ? (
           <MetaInfoContext.Provider
             value={{
               user: userClass,

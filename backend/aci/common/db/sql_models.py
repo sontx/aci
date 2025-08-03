@@ -67,7 +67,6 @@ class Base(MappedAsDataclass, DeclarativeBase):
 class Project(Base):
     """
     Project is a logical container for isolating and managing API keys, selected apps, and other data
-    Each project can have multiple agents (associated with API keys), which are logical actors that access our platform
     """
 
     __tablename__ = "projects"
@@ -113,10 +112,6 @@ class Project(Base):
         init=False,
     )
 
-    # deleting project will delete all associated resources under the project
-    agents: Mapped[list[Agent]] = relationship(
-        "Agent", lazy="select", cascade="all, delete-orphan", init=False
-    )
     app_configurations: Mapped[list[AppConfiguration]] = relationship(
         "AppConfiguration", lazy="select", cascade="all, delete-orphan", init=False
     )
@@ -125,59 +120,9 @@ class Project(Base):
     )
 
 
-class Agent(Base):
-    """
-    Agent is an actor under a project, each project can have multiple agents.
-    It's the logical entity that access our platform, as a result, api keys are associated with agents.
-    This is an opinionated design, intented for a multi-agent system, but subject to change.
-    """
-
-    __tablename__ = "agents"
-
-    id: Mapped[UUID] = mapped_column(
-        PGUUID(as_uuid=True), primary_key=True, default_factory=uuid4, init=False
-    )
-    project_id: Mapped[UUID] = mapped_column(
-        PGUUID(as_uuid=True), ForeignKey("projects.id"), nullable=False
-    )
-    name: Mapped[str] = mapped_column(String(MAX_STRING_LENGTH), nullable=False)
-    description: Mapped[str] = mapped_column(Text, nullable=False)
-    # agent level control of what apps are accessible by the agent, should be asubset of project configured apps
-    # we store a list of app names.
-    # TODO: reconsider if this should be in a separate table to enforce data integrity, or use periodic task to clean up
-    allowed_apps: Mapped[list[str]] = mapped_column(
-        ARRAY(String(MAX_STRING_LENGTH)), nullable=False
-    )
-    # TODO: should we use JSONB instead? As this will be frequently queried
-    # TODO: reconsider if this should be in a separate table to enforce data integrity, or use periodic task to clean up
-    # Custom instructions for the agent to follow. The key is the function name, and the value is the instruction.
-    custom_instructions: Mapped[dict[str, str]] = mapped_column(
-        MutableDict.as_mutable(JSONB),
-        nullable=False,
-    )
-
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=False), server_default=func.now(), nullable=False, init=False
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=False),
-        server_default=func.now(),
-        onupdate=func.now(),
-        nullable=False,
-        init=False,
-    )
-
-    # Note: for now each agent has one API key, but we can add more flexibility in the future if needed
-    # deleting agent will delete all API keys under the agent
-    api_keys: Mapped[list[APIKey]] = relationship(
-        "APIKey", lazy="select", cascade="all, delete-orphan", init=False
-    )
-
-
 class APIKey(Base):
     """
     APIKey is the authentication token to access the platform.
-    In this opinionated design, api key belongs to an agent.
     """
 
     __tablename__ = "api_keys"
@@ -190,8 +135,8 @@ class APIKey(Base):
     # "key" is the encrypted actual API key string that the user will use to authenticate
     key: Mapped[str] = mapped_column(Key(), nullable=False, unique=True)
     key_hmac: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
-    agent_id: Mapped[UUID] = mapped_column(
-        PGUUID(as_uuid=True), ForeignKey("agents.id"), unique=True, nullable=False
+    project_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("projects.id"), nullable=False
     )
     status: Mapped[APIKeyStatus] = mapped_column(SqlEnum(APIKeyStatus), nullable=False)
 
@@ -205,6 +150,8 @@ class APIKey(Base):
         nullable=False,
         init=False,
     )
+
+    project: Mapped[Project] = relationship("Project", lazy="select", init=False)
 
 
 # TODO: how to do versioning for app and funcitons to allow backward compatibility, or we don't actually need to
@@ -615,7 +562,6 @@ class ProcessedStripeEvent(Base):
 
 __all__ = [
     "APIKey",
-    "Agent",
     "App",
     "AppConfiguration",
     "Base",

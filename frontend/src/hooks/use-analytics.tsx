@@ -2,7 +2,6 @@
 
 import { useQueries, UseQueryResult } from "@tanstack/react-query";
 import { useMetaInfo } from "@/components/context/metainfo";
-import { getApiKey } from "@/lib/api/util";
 import {
   getAppDistributionData,
   getFunctionDistributionData,
@@ -29,32 +28,31 @@ export const analyticsKeys = {
 
 export function useAnalyticsQueries() {
   const { activeProject } = useMetaInfo();
-  const apiKey = getApiKey(activeProject);
 
   const results = useQueries({
     queries: [
       {
         queryKey: analyticsKeys.appDistribution(activeProject.id),
-        queryFn: () => getAppDistributionData(apiKey),
-        enabled: !!activeProject && !!apiKey,
+        queryFn: () => getAppDistributionData(),
+        enabled: !!activeProject,
         staleTime: 0,
       },
       {
         queryKey: analyticsKeys.functionDistribution(activeProject.id),
-        queryFn: () => getFunctionDistributionData(apiKey),
-        enabled: !!activeProject && !!apiKey,
+        queryFn: () => getFunctionDistributionData(),
+        enabled: !!activeProject,
         staleTime: 0,
       },
       {
         queryKey: analyticsKeys.appTimeSeries(activeProject.id),
-        queryFn: () => getAppTimeSeriesData(apiKey),
-        enabled: !!activeProject && !!apiKey,
+        queryFn: () => getAppTimeSeriesData(),
+        enabled: !!activeProject,
         staleTime: 0,
       },
       {
         queryKey: analyticsKeys.functionTimeSeries(activeProject.id),
-        queryFn: () => getFunctionTimeSeriesData(apiKey),
-        enabled: !!activeProject && !!apiKey,
+        queryFn: () => getFunctionTimeSeriesData(),
+        enabled: !!activeProject,
         staleTime: 0,
       },
     ],

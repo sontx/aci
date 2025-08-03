@@ -9,7 +9,6 @@ import {
   getAppConfig,
 } from "@/lib/api/appconfig";
 import { useMetaInfo } from "@/components/context/metainfo";
-import { getApiKey } from "@/lib/api/util";
 import { AppConfig } from "@/lib/types/appconfig";
 import { toast } from "sonner";
 import { linkedAccountKeys } from "./use-linked-account";
@@ -27,22 +26,20 @@ const appConfigKeys = {
 
 export const useAppConfigs = () => {
   const { activeProject } = useMetaInfo();
-  const apiKey = getApiKey(activeProject);
 
   return useQuery<AppConfig[], Error>({
     queryKey: appConfigKeys.all(activeProject.id),
-    queryFn: () => getAllAppConfigs(apiKey),
+    queryFn: () => getAllAppConfigs(),
   });
 };
 
 export const useAppConfig = (appName?: string | null) => {
   const { activeProject } = useMetaInfo();
-  const apiKey = getApiKey(activeProject);
 
   return useQuery<AppConfig | null, Error>({
     queryKey: appConfigKeys.detail(activeProject.id, appName),
     queryFn: () =>
-      appName ? getAppConfig(appName, apiKey) : Promise.resolve(null),
+      appName ? getAppConfig(appName) : Promise.resolve(null),
     enabled: !!appName,
   });
 };
@@ -62,14 +59,12 @@ type CreateAppConfigParams = {
 export const useCreateAppConfig = () => {
   const queryClient = useQueryClient();
   const { activeProject } = useMetaInfo();
-  const apiKey = getApiKey(activeProject);
 
   return useMutation<AppConfig, Error, CreateAppConfigParams>({
     mutationFn: (params) =>
       createAppConfig(
         params.app_name,
         params.security_scheme,
-        apiKey,
         params.security_scheme_overrides,
       ),
     onSuccess: (newConfig) => {
@@ -96,11 +91,10 @@ type UpdateAppConfigParams = {
 export const useUpdateAppConfig = () => {
   const queryClient = useQueryClient();
   const { activeProject } = useMetaInfo();
-  const apiKey = getApiKey(activeProject);
 
   return useMutation<AppConfig, Error, UpdateAppConfigParams>({
     mutationFn: (params) =>
-      updateAppConfig(params.app_name, params.enabled, apiKey),
+      updateAppConfig(params.app_name, params.enabled),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({
         queryKey: appConfigKeys.all(activeProject.id),
@@ -120,10 +114,9 @@ export const useUpdateAppConfig = () => {
 export const useDeleteAppConfig = () => {
   const queryClient = useQueryClient();
   const { activeProject } = useMetaInfo();
-  const apiKey = getApiKey(activeProject);
 
-  return useMutation<Response, Error, string>({
-    mutationFn: (app_name) => deleteAppConfig(app_name, apiKey),
+  return useMutation<void, Error, string>({
+    mutationFn: (app_name) => deleteAppConfig(app_name),
     onSuccess: (_, app_name) => {
       queryClient.invalidateQueries({
         queryKey: appConfigKeys.all(activeProject.id),

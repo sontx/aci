@@ -1,24 +1,26 @@
 from collections.abc import Generator
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
+from typing import Callable
 from uuid import UUID
 
-from fastapi import Depends, Request, Security
+from fastapi import Depends, Security
+from fastapi import Request, HTTPException, status
 from fastapi.security import APIKeyHeader, HTTPBearer
 from sqlalchemy.orm import Session
 
 from aci.common import utils
 from aci.common.db import crud
-from aci.common.db.sql_models import Agent, Project
+from aci.common.db.sql_models import Project
 from aci.common.enums import APIKeyStatus
 from aci.common.exceptions import (
-    AgentNotFound,
     DailyQuotaExceeded,
     InvalidAPIKey,
     ProjectNotFound,
 )
 from aci.common.logging_setup import get_logger
 from aci.server import billing, config
+from aci.server.config import ACI_PROJECT_ID_HEADER
 
 logger = get_logger(__name__)
 http_bearer = HTTPBearer(auto_error=True, description="login to receive a JWT token")
@@ -30,11 +32,9 @@ api_key_header = APIKeyHeader(
 
 
 class RequestContext:
-    def __init__(self, db_session: Session, api_key_id: UUID, project: Project, agent: Agent):
+    def __init__(self, db_session: Session, project: Project, ):
         self.db_session = db_session
-        self.api_key_id = api_key_id
         self.project = project
-        self.agent = agent
 
 
 def yield_db_session() -> Generator[Session, None, None]:
@@ -46,8 +46,8 @@ def yield_db_session() -> Generator[Session, None, None]:
 
 
 def validate_api_key(
-    db_session: Annotated[Session, Depends(yield_db_session)],
-    api_key_key: Annotated[str, Security(api_key_header)],
+        db_session: Annotated[Session, Depends(yield_db_session)],
+        api_key_key: Annotated[str, Security(api_key_header)],
 ) -> UUID:
     """Validate API key and return the API key ID. (not the actual API key string)"""
     api_key = crud.projects.get_api_key(db_session, api_key_key)
@@ -69,30 +69,30 @@ def validate_api_key(
         return api_key_id
 
 
-def validate_agent(
-    db_session: Annotated[Session, Depends(yield_db_session)],
-    api_key_id: Annotated[UUID, Depends(validate_api_key)],
-) -> Agent:
-    agent = crud.projects.get_agent_by_api_key_id(db_session, api_key_id)
-    if not agent:
-        raise AgentNotFound(f"Agent not found, api_key_id={api_key_id}")
+def get_header(header_name: str) -> Callable:
+    async def dependency(request: Request) -> str:
+        value = request.headers.get(header_name)
+        if value is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Missing header: {header_name}",
+            )
+        return value
 
-    return agent
+    return dependency
 
 
 # TODO: use cache (redis)
 # TODO: better way to handle replace(tzinfo=datetime.timezone.utc) ?
 # TODO: context return api key object instead of api_key_id
 def validate_project_quota(
-    db_session: Annotated[Session, Depends(yield_db_session)],
-    api_key_id: Annotated[UUID, Depends(validate_api_key)],
+        db_session: Annotated[Session, Depends(yield_db_session)],
+        project_id: str = Depends(get_header(ACI_PROJECT_ID_HEADER))
 ) -> Project:
-    logger.debug(f"Validating project quota, api_key_id={api_key_id}")
-
-    project = crud.projects.get_project_by_api_key_id(db_session, api_key_id)
+    project = crud.projects.get_project(db_session, UUID(project_id))
     if not project:
-        logger.error(f"Project not found, api_key_id={api_key_id}")
-        raise ProjectNotFound(f"Project not found, api_key_id={api_key_id}")
+        logger.error(f"Project not found, project_id={project_id}")
+        raise ProjectNotFound(f"Project not found, project_id={project_id}")
 
     now: datetime = datetime.now(UTC)
     need_reset = now >= project.daily_quota_reset_at.replace(tzinfo=UTC) + timedelta(days=1)
@@ -119,9 +119,9 @@ def validate_project_quota(
 
 
 def validate_monthly_api_quota(
-    request: Request,
-    db_session: Annotated[Session, Depends(yield_db_session)],
-    project: Annotated[Project, Depends(validate_project_quota)],
+        request: Request,
+        db_session: Annotated[Session, Depends(yield_db_session)],
+        project: Annotated[Project, Depends(validate_project_quota)],
 ) -> None:
     """
     Use quota for a project operation.
@@ -133,8 +133,8 @@ def validate_monthly_api_quota(
     # Only check quota for app search and function search/execute endpoints
     path = request.url.path
     is_quota_limited_endpoint = path.startswith(f"{config.ROUTER_PREFIX_APPS}/search") or (
-        path.startswith(f"{config.ROUTER_PREFIX_FUNCTIONS}/")
-        and (path.endswith("/execute") or path.endswith("/search"))
+            path.startswith(f"{config.ROUTER_PREFIX_FUNCTIONS}/")
+            and (path.endswith("/execute") or path.endswith("/search"))
     )
     if not is_quota_limited_endpoint:
         return
@@ -159,23 +159,18 @@ def validate_monthly_api_quota(
 
 
 def get_request_context(
-    db_session: Annotated[Session, Depends(yield_db_session)],
-    api_key_id: Annotated[UUID, Depends(validate_api_key)],
-    agent: Annotated[Agent, Depends(validate_agent)],
-    project: Annotated[Project, Depends(validate_project_quota)],
-    _: Annotated[None, Depends(validate_monthly_api_quota)],
+        db_session: Annotated[Session, Depends(yield_db_session)],
+        project: Annotated[Project, Depends(validate_project_quota)],
+        _: Annotated[None, Depends(validate_monthly_api_quota)],
 ) -> RequestContext:
     """
     Returns a RequestContext object containing the DB session,
     the validated API key ID, and the project ID.
     """
     logger.info(
-        f"Populating request context, api_key_id={api_key_id}, "
-        f"project_id={project.id}, agent_id={agent.id}"
+        f"Populating request context project_id={project.id}"
     )
     return RequestContext(
         db_session=db_session,
-        api_key_id=api_key_id,
         project=project,
-        agent=agent,
     )

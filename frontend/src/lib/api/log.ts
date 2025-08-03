@@ -1,14 +1,10 @@
-import { LogSearchResponse, LogSearchParams } from "@/lib/types/log";
+import { LogSearchParams, LogSearchResponse } from "@/lib/types/log";
+import axiosInstance from "@/lib/axios";
 
 export async function searchFunctionExecutionLogs(
   params: LogSearchParams = {},
-  orgId?: string,
-  accessToken?: string,
 ): Promise<LogSearchResponse> {
   const queryParams = new URLSearchParams();
-  if (!orgId || !accessToken) {
-    throw new Error("orgId and accessToken are required");
-  }
 
   for (const [key, value] of Object.entries(params)) {
     if (value !== undefined) {
@@ -16,19 +12,10 @@ export async function searchFunctionExecutionLogs(
     }
   }
 
-  const response = await fetch(`/api/logs?${queryParams.toString()}`, {
-    method: "GET",
-    headers: {
-      ...(accessToken && { Authorization: `Bearer ${accessToken}` }),
-      ...(orgId && { org_id: orgId }),
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(
-      `Failed to fetch logs: ${response.status} ${response.statusText}`,
-    );
-  }
-
-  return response.json();
+  // Note: This uses the Next.js API route instead of direct API call
+  // If you want to use the direct API endpoint, change this to use axiosInstance
+  const response = await axiosInstance.get(
+    `/api/logs?${queryParams.toString()}`,
+  );
+  return response.data;
 }

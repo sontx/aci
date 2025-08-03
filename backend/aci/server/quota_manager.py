@@ -13,7 +13,6 @@ from sqlalchemy.orm import Session
 from aci.common.db import crud
 from aci.common.exceptions import (
     MaxAgentSecretsReached,
-    MaxAgentsReached,
     MaxProjectsReached,
     MaxUniqueLinkedAccountOwnerIdsReached,
     ProjectNotFound,
@@ -52,26 +51,6 @@ def enforce_project_creation_quota(db_session: Session, org_id: UUID) -> None:
         raise MaxProjectsReached(
             message=f"Maximum number of projects ({max_projects}) reached for the {active_plan.name} plan"
         )
-
-
-def enforce_agent_creation_quota(db_session: Session, project_id: UUID) -> None:
-    """
-    Check and enforce that the project hasn't exceeded its agent creation quota.
-
-    Args:
-        db_session: Database session
-        project_id: ID of the project to check
-
-    Raises:
-        MaxAgentsReached: If the project has reached its maximum allowed agents
-    """
-    agents = crud.projects.get_agents_by_project(db_session, project_id)
-    if len(agents) >= config.MAX_AGENTS_PER_PROJECT:
-        logger.error(
-            f"Project has reached maximum agents quota, project_id={project_id}, "
-            f"max_agents={config.MAX_AGENTS_PER_PROJECT} num_agents={len(agents)}"
-        )
-        raise MaxAgentsReached()
 
 
 def enforce_linked_accounts_creation_quota(

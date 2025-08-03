@@ -1,4 +1,3 @@
-import { useMetaInfo } from "@/components/context/metainfo";
 import { getQuotaUsage } from "@/lib/api/quota";
 import { useQuery } from "@tanstack/react-query";
 
@@ -7,12 +6,9 @@ export const quotaKeys = {
 };
 
 export function useQuota() {
-  const { accessToken, activeOrg } = useMetaInfo();
-
   return useQuery({
     queryKey: quotaKeys.all,
-    queryFn: () => getQuotaUsage(accessToken, activeOrg.orgId),
-    enabled: !!activeOrg.orgId && !!accessToken,
+    queryFn: () => getQuotaUsage(),
     staleTime: 0,
   });
 }

@@ -11,7 +11,6 @@ import {
   removeToolFromMCPServer,
 } from "@/lib/api/mcpserver";
 import { useMetaInfo } from "@/components/context/metainfo";
-import { getApiKey } from "@/lib/api/util";
 import { MCPServerCreate, MCPServerUpdate, MCPServerResponse } from "@/lib/types/mcpserver";
 import { toast } from "sonner";
 
@@ -23,21 +22,19 @@ export const mcpServerKeys = {
 
 export const useMCPServers = () => {
   const { activeProject } = useMetaInfo();
-  const apiKey = getApiKey(activeProject);
 
   return useQuery<MCPServerResponse[], Error>({
     queryKey: mcpServerKeys.all(activeProject.id),
-    queryFn: () => getAllMCPServers(apiKey),
+    queryFn: () => getAllMCPServers(),
   });
 };
 
 export const useMCPServer = (mcpServerId?: string) => {
   const { activeProject } = useMetaInfo();
-  const apiKey = getApiKey(activeProject);
 
   return useQuery<MCPServerResponse, Error>({
     queryKey: mcpServerKeys.detail(activeProject.id, mcpServerId || ""),
-    queryFn: () => getMCPServer(mcpServerId!, apiKey),
+    queryFn: () => getMCPServer(mcpServerId!, ),
     enabled: !!mcpServerId,
   });
 };
@@ -45,10 +42,9 @@ export const useMCPServer = (mcpServerId?: string) => {
 export const useCreateMCPServer = () => {
   const queryClient = useQueryClient();
   const { activeProject } = useMetaInfo();
-  const apiKey = getApiKey(activeProject);
 
   return useMutation<MCPServerResponse, Error, MCPServerCreate>({
-    mutationFn: (data) => createMCPServer(data, apiKey),
+    mutationFn: (data) => createMCPServer(data),
     onSuccess: (newMCPServer) => {
       queryClient.setQueryData<MCPServerResponse[]>(
         mcpServerKeys.all(activeProject.id),
@@ -74,10 +70,9 @@ type UpdateMCPServerParams = {
 export const useUpdateMCPServer = () => {
   const queryClient = useQueryClient();
   const { activeProject } = useMetaInfo();
-  const apiKey = getApiKey(activeProject);
 
   return useMutation<MCPServerResponse, Error, UpdateMCPServerParams>({
-    mutationFn: (params) => updateMCPServer(params.mcpServerId, params.data, apiKey),
+    mutationFn: (params) => updateMCPServer(params.mcpServerId, params.data),
     onSuccess: (updatedMCPServer, variables) => {
       queryClient.setQueryData<MCPServerResponse[]>(
         mcpServerKeys.all(activeProject.id),
@@ -104,10 +99,9 @@ export const useUpdateMCPServer = () => {
 export const useDeleteMCPServer = () => {
   const queryClient = useQueryClient();
   const { activeProject } = useMetaInfo();
-  const apiKey = getApiKey(activeProject);
 
   return useMutation<void, Error, string>({
-    mutationFn: (mcpServerId) => deleteMCPServer(mcpServerId, apiKey),
+    mutationFn: (mcpServerId) => deleteMCPServer(mcpServerId),
     onSuccess: (_, mcpServerId) => {
       queryClient.setQueryData<MCPServerResponse[]>(
         mcpServerKeys.all(activeProject.id),
@@ -136,10 +130,9 @@ type AddToolParams = {
 export const useAddToolToMCPServer = () => {
   const queryClient = useQueryClient();
   const { activeProject } = useMetaInfo();
-  const apiKey = getApiKey(activeProject);
 
   return useMutation<MCPServerResponse, Error, AddToolParams>({
-    mutationFn: (params) => addToolToMCPServer(params.mcpServerId, params.toolFunctionId, apiKey),
+    mutationFn: (params) => addToolToMCPServer(params.mcpServerId, params.toolFunctionId),
     onSuccess: (updatedMCPServer, variables) => {
       queryClient.setQueryData<MCPServerResponse[]>(
         mcpServerKeys.all(activeProject.id),
@@ -171,10 +164,9 @@ type RemoveToolParams = {
 export const useRemoveToolFromMCPServer = () => {
   const queryClient = useQueryClient();
   const { activeProject } = useMetaInfo();
-  const apiKey = getApiKey(activeProject);
 
   return useMutation<MCPServerResponse, Error, RemoveToolParams>({
-    mutationFn: (params) => removeToolFromMCPServer(params.mcpServerId, params.toolFunctionId, apiKey),
+    mutationFn: (params) => removeToolFromMCPServer(params.mcpServerId, params.toolFunctionId),
     onSuccess: (updatedMCPServer, variables) => {
       queryClient.setQueryData<MCPServerResponse[]>(
         mcpServerKeys.all(activeProject.id),
