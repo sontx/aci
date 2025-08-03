@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -13,13 +13,13 @@ import { Badge } from "@/components/ui/badge";
 import Image from "next/image";
 
 import { ConfigureAppStep } from "@/components/apps/configure-app/configure-app-step";
-import { AgentSelectionStep } from "@/components/apps/configure-app/agent-selection-step";
+import { MCPServerStep } from "@/components/apps/configure-app/mcp-server-step";
 import { LinkedAccountStep } from "@/components/apps/configure-app/linked-account-step";
 
 // step definitions
 const STEPS = [
   { id: 1, title: "Configure App" },
-  { id: 2, title: "Select Agents" },
+  { id: 2, title: "Add MCP Server" },
   { id: 3, title: "Add Linked Account" },
 ];
 
@@ -40,6 +40,7 @@ export function ConfigureApp({
   const [currentStep, setCurrentStep] = useState(1);
 
   const [security_scheme, setSelectedSecurityScheme] = useState<string>("");
+  const [appConfigId, setAppConfigId] = useState<string>("");
 
   const resetAll = useCallback(() => {
     setCurrentStep(1);
@@ -53,12 +54,16 @@ export function ConfigureApp({
   }, [open, resetAll]);
 
   // step navigation handlers
-  const handleConfigureAppNext = (selectedSecurityScheme: string) => {
+  const handleConfigureAppNext = (
+    selectedSecurityScheme: string,
+    appConfigId: string,
+  ) => {
     setSelectedSecurityScheme(selectedSecurityScheme);
+    setAppConfigId(appConfigId);
     setCurrentStep(2);
   };
 
-  const handleAgentSelectionNext = () => {
+  const handleMCPServerNext = () => {
     setCurrentStep(3);
   };
 
@@ -100,10 +105,9 @@ export function ConfigureApp({
           )}
 
           {currentStep === 2 && (
-            <AgentSelectionStep
-              onNext={handleAgentSelectionNext}
-              appName={name}
-              isDialogOpen={open}
+            <MCPServerStep
+              onNext={handleMCPServerNext}
+              appConfigId={appConfigId}
             />
           )}
 

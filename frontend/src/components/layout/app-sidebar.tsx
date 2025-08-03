@@ -23,10 +23,12 @@ import {
 } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import { PiStorefront } from "react-icons/pi";
-import { RiSettings3Line, RiLinkUnlinkM } from "react-icons/ri";
+import {
+  RiFileList3Line,
+  RiLinkUnlinkM,
+  RiSettings3Line,
+} from "react-icons/ri";
 import { AiOutlineRobot } from "react-icons/ai";
-import { HiOutlineChatBubbleBottomCenterText } from "react-icons/hi2";
-import { RiFileList3Line } from "react-icons/ri";
 import { HiOutlineServer } from "react-icons/hi2";
 
 import {
@@ -61,16 +63,6 @@ export const sidebarItems = [
     title: "MCP Servers",
     url: `/mcp-servers`,
     icon: HiOutlineServer,
-  },
-  {
-    title: "Agents",
-    url: `/agents`,
-    icon: AiOutlineRobot,
-  },
-  {
-    title: "Agent Playground",
-    url: `/playground`,
-    icon: HiOutlineChatBubbleBottomCenterText,
   },
   ...(showLogDashboard
     ? [

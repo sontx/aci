@@ -75,7 +75,7 @@ const defaultRedirectUrl = `${process.env.NEXT_PUBLIC_API_URL}/v1/linked-account
 
 interface ConfigureAppStepProps {
   supported_security_schemes: Record<string, { scope?: string }>;
-  onNext: (securityScheme: string) => void;
+  onNext: (securityScheme: string, appConfigId: string) => void;
   name: string;
 }
 
@@ -182,14 +182,14 @@ export function ConfigureAppStep({
         };
       }
 
-      await createAppConfigMutation({
+      const newAppConfig = await createAppConfigMutation({
         app_name: name,
         security_scheme: values.security_scheme,
         security_scheme_overrides,
       });
 
       toast.success(`Successfully configured app: ${name}`);
-      onNext(values.security_scheme);
+      onNext(values.security_scheme, newAppConfig.id);
     } catch (error) {
       if (error instanceof AppAlreadyConfiguredError) {
         toast.error(`App configuration already exists for app: ${name}`);

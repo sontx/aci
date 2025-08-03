@@ -1,6 +1,5 @@
 import { useMemo } from "react";
-import { useRouter } from "next/navigation";
-import { createColumnHelper, type ColumnDef } from "@tanstack/react-table";
+import { type ColumnDef, createColumnHelper } from "@tanstack/react-table";
 import { MCPServerResponse } from "@/lib/types/mcpserver";
 import { Button } from "@/components/ui/button";
 import { GoTrash } from "react-icons/go";
@@ -13,10 +12,10 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
+  AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogDescription,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
@@ -33,7 +32,6 @@ export const useMCPServersTableColumns = ({
   appsMap,
 }: MCPServersTableColumnsProps): ColumnDef<MCPServerResponse>[] => {
   const { mutateAsync: deleteMCPServer } = useDeleteMCPServer();
-  const router = useRouter();
 
   return useMemo(
     () => [
@@ -145,6 +143,6 @@ export const useMCPServersTableColumns = ({
         enableGlobalFilter: false,
       }) as ColumnDef<MCPServerResponse>,
     ],
-    [router, deleteMCPServer, appsMap],
+    [deleteMCPServer, appsMap],
   );
 };
