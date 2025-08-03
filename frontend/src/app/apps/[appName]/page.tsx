@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { useAppFunctionsColumns } from "@/components/apps/useAppFunctionsColumns";
 import { Separator } from "@/components/ui/separator";
 import { useParams } from "next/navigation";
@@ -9,31 +9,27 @@ import { Button } from "@/components/ui/button";
 import { BsQuestionCircle } from "react-icons/bs";
 import {
   Tooltip,
-  TooltipTrigger,
   TooltipContent,
+  TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { type AppFunction } from "@/lib/types/appfunction";
 import { useApp } from "@/hooks/use-app";
 import Image from "next/image";
 import { ConfigureApp } from "@/components/apps/configure-app";
 import { EnhancedDataTable } from "@/components/ui-extensions/enhanced-data-table/data-table";
 import { useAppConfig } from "@/hooks/use-app-config";
 import { Loader2 } from "lucide-react";
+import { useAppFunctions } from "@/hooks/use-app-functions";
+import { AppFunction } from "@/lib/types/appfunction";
 
 const AppPage = () => {
   const { appName } = useParams<{ appName: string }>();
-  const [functions, setFunctions] = useState<AppFunction[]>([]);
   const { app } = useApp(appName);
+  const { data: functions = [], isPending: isFunctionsPending } =
+    useAppFunctions(appName, true);
   const { data: appConfig, isPending: isAppConfigLoading } =
     useAppConfig(appName);
 
   const columns = useAppFunctionsColumns();
-
-  useEffect(() => {
-    if (app) {
-      setFunctions(app.functions);
-    }
-  }, [app]);
 
   return (
     <div>
@@ -105,8 +101,9 @@ const AppPage = () => {
 
       <div className="m-4">
         <EnhancedDataTable
+          loading={isFunctionsPending}
           columns={columns}
-          data={functions}
+          data={functions as AppFunction[]}
           searchBarProps={{ placeholder: "Search functions..." }}
           paginationOptions={{
             initialPageIndex: 0,

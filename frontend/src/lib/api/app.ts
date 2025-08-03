@@ -1,4 +1,5 @@
 import { App } from "@/lib/types/app";
+import { AppFunction } from "@/lib/types/appfunction";
 
 export interface BasicFunctionDefinition {
   name: string;
@@ -61,10 +62,11 @@ export async function getApp(
 
 export async function getAppFunctions(
   appName: string,
+  raw: boolean,
   apiKey: string,
-): Promise<BasicFunctionDefinition[]> {
+): Promise<BasicFunctionDefinition[] | AppFunction[]> {
   const response = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL}/v1/apps/${appName}/functions`,
+    `${process.env.NEXT_PUBLIC_API_URL}/v1/apps/${appName}/functions?raw=${raw}`,
     {
       method: "GET",
       headers: {

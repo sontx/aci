@@ -78,3 +78,26 @@ export async function searchFunctions(
   const functions = await response.json();
   return functions;
 }
+
+export async function getAppFunction(
+  name: string,
+  apiKey: string,
+): Promise<AppFunction> {
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL}/v1/functions/${name}/definition?format=raw`,
+    {
+      method: "GET",
+      headers: {
+        "X-API-KEY": apiKey,
+      },
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to fetch app function: ${response.status} ${response.statusText}`,
+    );
+  }
+
+  return await response.json();
+}

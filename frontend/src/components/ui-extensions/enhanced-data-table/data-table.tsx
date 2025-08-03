@@ -36,6 +36,7 @@ import { EnhancedDataTableToolbar } from "@/components/ui-extensions/enhanced-da
 import { ColumnFilter } from "@/components/ui-extensions/enhanced-data-table/column-filter";
 import { getRowSelectionColumn } from "@/components/ui-extensions/enhanced-data-table/row-selection-column";
 import { DataTablePagination } from "@/components/ui-extensions/enhanced-data-table/data-table-pagination";
+import { Loader2Icon } from "lucide-react";
 
 interface SearchBarProps {
   placeholder: string;
@@ -62,6 +63,7 @@ interface EnhancedDataTableProps<TData, TValue> {
   searchBarProps?: SearchBarProps;
   rowSelectionProps?: RowSelectionProps<TData>;
   paginationOptions?: PaginationOptions;
+  loading?: boolean;
 }
 
 export function EnhancedDataTable<TData, TValue>({
@@ -71,6 +73,7 @@ export function EnhancedDataTable<TData, TValue>({
   searchBarProps,
   rowSelectionProps,
   paginationOptions,
+  loading = false,
 }: EnhancedDataTableProps<TData, TValue>) {
   const generatedDefaultSorting = useMemo(() => {
     if (defaultSorting.length > 0) return defaultSorting;
@@ -233,7 +236,19 @@ export function EnhancedDataTable<TData, TValue>({
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows?.length ? (
+            {loading ? (
+              <TableRow>
+                <TableCell
+                  colSpan={allColumns.length}
+                  className="h-24 text-center"
+                >
+                  <div className="flex items-center justify-center">
+                    <Loader2Icon className="animate-spin" />
+                    <span className="ml-2">Loading...</span>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
@@ -252,7 +267,7 @@ export function EnhancedDataTable<TData, TValue>({
             ) : (
               <TableRow>
                 <TableCell
-                  colSpan={columns.length}
+                  colSpan={allColumns.length}
                   className="h-24 text-center"
                 >
                   No results found
