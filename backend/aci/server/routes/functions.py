@@ -8,7 +8,6 @@ from sqlalchemy.orm import Session
 
 from aci.common.db import crud
 from aci.common.db.sql_models import Function, Project
-from aci.common.embeddings import generate_embedding
 from aci.common.enums import FunctionDefinitionFormat, Visibility
 from aci.common.exceptions import (
     AppConfigurationDisabled,
@@ -38,10 +37,6 @@ from aci.server.utils import format_function_definition
 
 router = APIRouter()
 logger = get_logger(__name__)
-# TODO: will this be a bottleneck and problem if high concurrent requests from users?
-# TODO: should probably be a singleton and inject into routes, shared access with Apps route
-openai_client = OpenAI(api_key=config.OPENAI_API_KEY)
-
 
 @router.get("", response_model=list[FunctionDetails])
 async def list_functions(
@@ -75,20 +70,6 @@ async def search_functions(
     # TODO: currently the search is done across all apps, we might want to add flags to account for below scenarios:
     # - when clients search for functions, if the app of the functions is configured but disabled by client, should the functions be discoverable?
 
-    intent_embedding = (
-        generate_embedding(
-            openai_client,
-            config.OPENAI_EMBEDDING_MODEL,
-            config.OPENAI_EMBEDDING_DIMENSION,
-            query_params.intent,
-        )
-        if query_params.intent
-        else None
-    )
-    logger.debug(
-        f"Generated intent embedding, intent={query_params.intent}, intent_embedding={intent_embedding}"
-    )
-
     # get the apps to filter (or not) based on the allowed_apps_only and app_names query params
     if query_params.allowed_apps_only:
         if query_params.app_names is None:
@@ -106,7 +87,6 @@ async def search_functions(
         context.project.visibility_access == Visibility.PUBLIC,
         True,
         apps_to_filter,
-        intent_embedding,
         query_params.limit,
         query_params.offset,
     )
@@ -260,7 +240,6 @@ async def execute_function(
         function_name: Name of the function to execute
         function_input: Input parameters for the function
         linked_account_owner_id: ID of the linked account owner
-        openai_client: Optional OpenAI client for custom instructions validation
 
     Returns:
         FunctionExecutionResult: Result of the function execution

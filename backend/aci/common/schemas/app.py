@@ -60,19 +60,6 @@ class AppUpsert(BaseModel, extra="forbid"):
                 raise ValueError(f"Invalid configuration for NO_AUTH scheme: {scheme_config}")
         return v
 
-
-class AppEmbeddingFields(BaseModel):
-    """
-    Fields used to generate app embedding.
-    """
-
-    name: str
-    display_name: str
-    provider: str
-    description: str
-    categories: list[str]
-
-
 class AppsSearch(BaseModel):
     """
     Parameters for searching applications.

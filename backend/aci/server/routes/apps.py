@@ -1,11 +1,8 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
-from openai import OpenAI
 
 from aci.common.db import crud
-from aci.common.db.sql_models import Function
-from aci.common.embeddings import generate_embedding
 from aci.common.enums import Visibility, FunctionDefinitionFormat
 from aci.common.exceptions import AppNotFound
 from aci.common.logging_setup import get_logger
@@ -17,14 +14,11 @@ from aci.common.schemas.app import (
 )
 from aci.common.schemas.function import BasicFunctionDefinition, FunctionDetails
 from aci.common.schemas.security_scheme import SecuritySchemesPublic
-from aci.server.utils import format_function_definition
-from aci.server import config
 from aci.server import dependencies as deps
+from aci.server.utils import format_function_definition
 
 logger = get_logger(__name__)
 router = APIRouter()
-# TODO: will this be a bottleneck and problem if high concurrent requests from users?
-openai_client = OpenAI(api_key=config.OPENAI_API_KEY)
 
 
 @router.get("", response_model_exclude_none=True)
@@ -79,19 +73,7 @@ async def search_apps(
     """
     # TODO: currently the search is done across all apps, we might want to add flags to account for below scenarios:
     # - when clients search for apps, if an app is configured but disabled by client, should it be discoverable?
-    intent_embedding = (
-        generate_embedding(
-            openai_client,
-            config.OPENAI_EMBEDDING_MODEL,
-            config.OPENAI_EMBEDDING_DIMENSION,
-            query_params.intent,
-        )
-        if query_params.intent
-        else None
-    )
-    logger.debug(
-        f"Generated intent embedding, intent={query_params.intent}, intent_embedding={intent_embedding}"
-    )
+
     # if the search is restricted to allowed apps, we need to filter the apps by the agent's allowed apps.
     # None means no filtering
     apps_to_filter = context.agent.allowed_apps if query_params.allowed_apps_only else None
@@ -102,7 +84,6 @@ async def search_apps(
         True,
         apps_to_filter,
         query_params.categories,
-        intent_embedding,
         query_params.limit,
         query_params.offset,
     )

@@ -16,14 +16,12 @@ logger = get_logger(__name__)
 def create_app(
     db_session: Session,
     app_upsert: AppUpsert,
-    app_embedding: list[float],
 ) -> App:
     logger.debug(f"Creating app: {app_upsert}")
 
     app_data = app_upsert.model_dump(mode="json", exclude_none=True)
     app = App(
         **app_data,
-        embedding=app_embedding,
     )
 
     db_session.add(app)
@@ -36,19 +34,14 @@ def update_app(
     db_session: Session,
     app: App,
     app_upsert: AppUpsert,
-    app_embedding: list[float] | None = None,
 ) -> App:
     """
     Update an existing app.
-    With the option to update the app embedding. (needed if AppEmbeddingFields are updated)
     """
     new_app_data = app_upsert.model_dump(mode="json", exclude_unset=True)
 
     for field, value in new_app_data.items():
         setattr(app, field, value)
-
-    if app_embedding is not None:
-        app.embedding = app_embedding
 
     db_session.flush()
     db_session.refresh(app)
@@ -105,7 +98,6 @@ def search_apps(
     active_only: bool,
     app_names: list[str] | None,
     categories: list[str] | None,
-    intent_embedding: list[float] | None,
     limit: int,
     offset: int,
 ) -> list[tuple[App, float | None]]:
@@ -129,22 +121,13 @@ def search_apps(
     if categories is not None:
         statement = statement.filter(App.categories.overlap(categories))
 
-    # sort by similarity to intent
-    if intent_embedding is not None:
-        similarity_score = App.embedding.cosine_distance(intent_embedding)
-        statement = statement.add_columns(similarity_score.label("similarity_score"))
-        statement = statement.order_by("similarity_score")
-
     statement = statement.offset(offset).limit(limit)
 
     logger.debug(f"Executing statement, statement={statement}")
 
     results = db_session.execute(statement).all()
 
-    if intent_embedding is not None:
-        return [(app, score) for app, score in results]
-    else:
-        return [(app, None) for (app,) in results]
+    return [(app, None) for (app,) in results]
 
 
 def set_app_active_status(db_session: Session, app_name: str, active: bool) -> None:

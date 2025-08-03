@@ -2,11 +2,6 @@ from aci.common.utils import check_and_get_env_variable, construct_db_url
 
 ENVIRONMENT = check_and_get_env_variable("SERVER_ENVIRONMENT")
 
-# LLM
-OPENAI_API_KEY = check_and_get_env_variable("SERVER_OPENAI_API_KEY")
-OPENAI_EMBEDDING_MODEL = check_and_get_env_variable("SERVER_OPENAI_EMBEDDING_MODEL")
-OPENAI_EMBEDDING_DIMENSION = int(check_and_get_env_variable("SERVER_OPENAI_EMBEDDING_DIMENSION"))
-
 # JWT
 SIGNING_KEY = check_and_get_env_variable("SERVER_SIGNING_KEY")
 JWT_ALGORITHM = check_and_get_env_variable("SERVER_JWT_ALGORITHM")

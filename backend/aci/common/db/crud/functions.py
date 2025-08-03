@@ -16,7 +16,6 @@ logger = get_logger(__name__)
 def create_functions(
     db_session: Session,
     functions_upsert: list[FunctionUpsert],
-    functions_embeddings: list[list[float]],
 ) -> list[Function]:
     """
     Create functions.
@@ -35,7 +34,6 @@ def create_functions(
         function = Function(
             app_id=app.id,
             **function_data,
-            embedding=functions_embeddings[i],
         )
         db_session.add(function)
         functions.append(function)
@@ -48,12 +46,10 @@ def create_functions(
 def update_functions(
     db_session: Session,
     functions_upsert: list[FunctionUpsert],
-    functions_embeddings: list[list[float] | None],
 ) -> list[Function]:
     """
     Update functions.
     Note: each function might be of different app.
-    With the option to update the function embedding. (needed if FunctionEmbeddingFields are updated)
     """
     logger.debug(f"Updating functions, functions_upsert={functions_upsert}")
     functions = []
@@ -66,8 +62,6 @@ def update_functions(
         function_data = function_upsert.model_dump(mode="json", exclude_unset=True)
         for field, value in function_data.items():
             setattr(function, field, value)
-        if functions_embeddings[i] is not None:
-            function.embedding = functions_embeddings[i]  # type: ignore
         functions.append(function)
 
     db_session.flush()
@@ -80,7 +74,6 @@ def search_functions(
     public_only: bool,
     active_only: bool,
     app_names: list[str] | None,
-    intent_embedding: list[float] | None,
     limit: int,
     offset: int,
 ) -> list[Function]:
@@ -100,10 +93,6 @@ def search_functions(
     # filter out functions that are not in the specified apps
     if app_names is not None:
         statement = statement.filter(App.name.in_(app_names))
-
-    if intent_embedding is not None:
-        similarity_score = Function.embedding.cosine_distance(intent_embedding)
-        statement = statement.order_by(similarity_score)
 
     statement = statement.offset(offset).limit(limit)
     logger.debug(f"Executing statement, statement={statement}")
