@@ -25,31 +25,9 @@ interface AppCardProps {
 }
 
 export function AppCard({ app, isConfigured = false }: AppCardProps) {
-  const { data: linkedAccounts = [] } = useAppLinkedAccounts(app.name);
   return (
     <Link href={`/apps/${app.name}`} className="block">
       <Card className="h-[300px] transition-shadow hover:shadow-lg flex flex-col overflow-hidden relative">
-        {isConfigured && (
-          <div className="absolute top-2 right-2 z-10">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Badge
-                    variant="secondary"
-                    className="bg-green-100 text-green-700 border-green-200 flex items-center gap-1"
-                  >
-                    <CheckCircle className="h-3 w-3" />
-                    Configured
-                  </Badge>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>App already configured for this project</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </div>
-        )}
-
         <CardHeader className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 min-w-0 flex-1 mr-4">
@@ -63,46 +41,22 @@ export function AppCard({ app, isConfigured = false }: AppCardProps) {
               </div>
               <div>
                 <CardTitle className="truncate">{app.display_name}</CardTitle>
-                {(app.functions.length > 0 || linkedAccounts.length > 0) && (
+                {isConfigured && (
                   <TooltipProvider>
-                    <div className="flex gap-2 mt-1">
-                      {app.functions.length > 0 && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Badge
-                              className="h-6 min-w-5 px-2 font-mono tabular-nums"
-                              variant="outline"
-                            >
-                              <Hammer className="h-3 w-3 mr-1" />
-                              {app.functions.length}
-                            </Badge>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p className="text-xs">
-                              {`Functions in This App: ${app.functions.length}`}
-                            </p>
-                          </TooltipContent>
-                        </Tooltip>
-                      )}
-                      {linkedAccounts.length > 0 && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Badge
-                              className="h-6 min-w-5 px-2 font-mono tabular-nums"
-                              variant="outline"
-                            >
-                              <CircleUser className="h-3 w-3 mr-1" />
-                              {linkedAccounts.length}
-                            </Badge>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p className="text-xs">
-                              {`Linked Accounts: ${linkedAccounts.length}`}
-                            </p>
-                          </TooltipContent>
-                        </Tooltip>
-                      )}
-                    </div>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Badge
+                          variant="secondary"
+                          className="max-w-max mt-1 bg-green-100 text-green-700 border-green-200 flex items-center gap-1"
+                        >
+                          <CheckCircle className="h-3 w-3" />
+                          Configured
+                        </Badge>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>App already configured for this project</p>
+                      </TooltipContent>
+                    </Tooltip>
                   </TooltipProvider>
                 )}
               </div>

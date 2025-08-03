@@ -164,3 +164,13 @@ cython_debug/
 cdk.out
 
 tmp/
+backend/.idea/.gitignore
+backend/.idea/backend.iml
+backend/.idea/copilotDiffState.xml
+backend/.idea/dataSources.xml
+backend/.idea/misc.xml
+backend/.idea/modules.xml
+backend/.idea/vcs.xml
+backend/.idea/codeStyles/codeStyleConfig.xml
+backend/.idea/codeStyles/Project.xml
+backend/.idea/inspectionProfiles/profiles_settings.xml
