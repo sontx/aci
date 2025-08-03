@@ -53,7 +53,7 @@ export default function AppConfigDetailPage() {
   );
 
   const linkedAccountsColumns =
-    useLinkedAccountsTableColumns(toggleAccountStatus);
+    useLinkedAccountsTableColumns(toggleAccountStatus, true);
 
   return (
     <div className="p-6">
