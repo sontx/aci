@@ -17,6 +17,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { UserClass } from "@propelauth/javascript";
 import { useProjects, useReloadProjects } from "@/hooks/use-project";
+import { useOrgs } from "@/hooks/use-org";
 
 interface MetaInfoContextType {
   user: UserClass;
@@ -40,10 +41,13 @@ interface MetaInfoProviderProps extends WithLoggedInAuthInfoProps {
 
 export const MetaInfoProvider = withRequiredAuthInfo<MetaInfoProviderProps>(
   ({ children, userClass, accessToken, refreshAuthInfo }) => {
-    const [orgs, setOrgs] = useState<OrgMemberInfoClass[]>([]);
     const [activeOrg, setActiveOrg] = useState<OrgMemberInfoClass | null>(null);
     const [activeProject, setActiveProject] = useState<Project | null>(null);
 
+    const { data: orgs = [], isLoading: orgsLoading } = useOrgs(
+      userClass,
+      refreshAuthInfo,
+    );
     const { data: projects = [], isLoading: projectsLoading } = useProjects(
       activeOrg?.orgId,
       accessToken,
@@ -51,31 +55,14 @@ export const MetaInfoProvider = withRequiredAuthInfo<MetaInfoProviderProps>(
     const reloadProjectsFunc = useReloadProjects();
 
     useEffect(() => {
-      async function getOrgs() {
-        // TODO: refactor this retry logic to use TanStack Query to
-        // elegantly handle the loading and error state
-        let retrievedOrgs = userClass.getOrgs();
-
-        let attempts = 0;
-        const maxAttempts = 5;
-
-        // Wait for the default Personal Org to be created
-        while (retrievedOrgs.length === 0 && attempts < maxAttempts) {
-          await refreshAuthInfo();
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-          retrievedOrgs = userClass.getOrgs();
-          attempts++;
-          console.log("retrievedOrgs", retrievedOrgs, attempts);
-        }
-        setOrgs(retrievedOrgs);
-      }
-      getOrgs();
-    }, [userClass, refreshAuthInfo]);
-
-    useEffect(() => {
       if (orgs.length > 0) {
-        // TODO: get active org from local storage
-        setActiveOrg(orgs[0]);
+        // Get active org from local storage
+        const savedOrgId = localStorage.getItem("activeOrgId");
+        const savedOrg = savedOrgId
+          ? orgs.find((org) => org.orgId === savedOrgId)
+          : null;
+
+        setActiveOrg(savedOrg || orgs[0]);
       }
     }, [orgs]);
 
@@ -101,6 +88,17 @@ export const MetaInfoProvider = withRequiredAuthInfo<MetaInfoProviderProps>(
       }
     }, [activeProject, activeOrg]);
 
+    useEffect(() => {
+      if (activeOrg) {
+        localStorage.setItem("activeOrgId", activeOrg.orgId);
+      }
+    }, [activeOrg]);
+
+    const handleSetActiveOrg = useCallback((org: OrgMemberInfoClass) => {
+      setActiveOrg(org);
+      localStorage.setItem("activeOrgId", org.orgId);
+    }, []);
+
     const reloadActiveProject = useCallback(async () => {
       if (activeOrg && accessToken) {
         await reloadProjectsFunc(activeOrg.orgId);
@@ -109,13 +107,13 @@ export const MetaInfoProvider = withRequiredAuthInfo<MetaInfoProviderProps>(
 
     return (
       <div>
-        {activeOrg && activeProject && accessToken && !projectsLoading ? (
+        {activeOrg && activeProject && accessToken && !projectsLoading && !orgsLoading ? (
           <MetaInfoContext.Provider
             value={{
               user: userClass,
               orgs,
               activeOrg,
-              setActiveOrg,
+              setActiveOrg: handleSetActiveOrg,
               projects,
               activeProject,
               setActiveProject,
