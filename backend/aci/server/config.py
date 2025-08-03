@@ -46,9 +46,9 @@ APPLICATION_LOAD_BALANCER_DNS = check_and_get_env_variable("SERVER_APPLICATION_L
 # APP
 APP_TITLE = "ACI"
 APP_VERSION = "0.0.1-beta.4"
-APP_DOCS_URL = "/v1/notforhuman-docs"
-APP_REDOC_URL = "/v1/notforhuman-redoc"
-APP_OPENAPI_URL = "/v1/notforhuman-openapi.json"
+APP_DOCS_URL = "/v1/api-docs"
+APP_REDOC_URL = "/v1/api-redoc"
+APP_OPENAPI_URL = "/v1/api-json"
 
 # ROUTERS
 ROUTER_PREFIX_HEALTH = "/v1/health"

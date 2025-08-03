@@ -149,6 +149,7 @@ async def get_function_definition(
     | OpenAIFunctionDefinition
     | OpenAIResponsesFunctionDefinition
     | AnthropicFunctionDefinition
+    | FunctionDetails
 ):
     """
     Return the function definition that can be used directly by LLM.

@@ -158,7 +158,5 @@ class AppDetails(BaseModel):
     # consider merging the two fields in the future
     supported_security_schemes: SecuritySchemesPublic
 
-    functions: list[FunctionDetails]
-
     created_at: datetime
     updated_at: datetime

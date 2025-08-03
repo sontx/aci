@@ -20,7 +20,6 @@ from aci.server.log_schema_filter import LogSchemaFilter
 from aci.server.middleware.interceptor import InterceptorMiddleware, RequestContextFilter
 from aci.server.middleware.ratelimit import RateLimitMiddleware
 from aci.server.routes import (
-    agent,
     analytics,
     app_configurations,
     apps,
@@ -160,12 +159,6 @@ app.include_router(
     linked_accounts.router,
     prefix=config.ROUTER_PREFIX_LINKED_ACCOUNTS,
     tags=[config.ROUTER_PREFIX_LINKED_ACCOUNTS.split("/")[-1]],
-)
-
-app.include_router(
-    agent.router,
-    prefix=config.ROUTER_PREFIX_AGENT,
-    tags=[config.ROUTER_PREFIX_AGENT.split("/")[-1]],
 )
 
 app.include_router(

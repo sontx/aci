@@ -3,7 +3,7 @@ from aci.common.db.sql_models import Function
 from aci.common.enums import FunctionDefinitionFormat
 from aci.common.exceptions import InvalidFunctionDefinitionFormat
 from aci.common.schemas.function import BasicFunctionDefinition, OpenAIFunctionDefinition, \
-    OpenAIResponsesFunctionDefinition, AnthropicFunctionDefinition, OpenAIFunction
+    OpenAIResponsesFunctionDefinition, AnthropicFunctionDefinition, OpenAIFunction, FunctionDetails
 
 
 def truncate_if_too_large(data: str, max_size: int) -> str:
@@ -23,8 +23,25 @@ def format_function_definition(
         | OpenAIFunctionDefinition
         | OpenAIResponsesFunctionDefinition
         | AnthropicFunctionDefinition
+        | FunctionDetails
 ):
     match format:
+        case FunctionDefinitionFormat.RAW:
+            return FunctionDetails(
+                id=function.id,
+                app_name=function.app_name,
+                name=function.name,
+                description=function.description,
+                tags=function.tags,
+                visibility=function.visibility,
+                active=function.active,
+                protocol=function.protocol,
+                protocol_data=function.protocol_data,
+                response=function.response,
+                parameters=function.parameters,
+                created_at=function.created_at,
+                updated_at=function.updated_at,
+            )
         case FunctionDefinitionFormat.BASIC:
             return BasicFunctionDefinition(
                 name=function.name,

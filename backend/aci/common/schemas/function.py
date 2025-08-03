@@ -212,7 +212,6 @@ class BasicFunctionDefinition(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-
 class FunctionExecutionResult(BaseModel):
     success: bool
     data: Any | None = None  # adding "| None" just for clarity

@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Query
 from openai import OpenAI
 
 from aci.common.db import crud
+from aci.common.db.sql_models import Function
 from aci.common.embeddings import generate_embedding
 from aci.common.enums import Visibility, FunctionDefinitionFormat
 from aci.common.exceptions import AppNotFound
@@ -28,8 +29,8 @@ openai_client = OpenAI(api_key=config.OPENAI_API_KEY)
 
 @router.get("", response_model_exclude_none=True)
 async def list_apps(
-    context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
-    query_params: Annotated[AppsList, Query()],
+        context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
+        query_params: Annotated[AppsList, Query()],
 ) -> list[AppDetails]:
     """
     Get a list of Apps and their details. Sorted by App name.
@@ -59,7 +60,6 @@ async def list_apps(
             security_schemes=list(app.security_schemes.keys()),
             # TODO: check validation latency
             supported_security_schemes=SecuritySchemesPublic.model_validate(app.security_schemes),
-            functions=[FunctionDetails.model_validate(function) for function in app.functions],
             created_at=app.created_at,
             updated_at=app.updated_at,
         )
@@ -70,8 +70,8 @@ async def list_apps(
 
 @router.get("/search", response_model_exclude_none=True)
 async def search_apps(
-    context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
-    query_params: Annotated[AppsSearch, Query()],
+        context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
+        query_params: Annotated[AppsSearch, Query()],
 ) -> list[AppBasic]:
     """
     Search for Apps.
@@ -112,7 +112,7 @@ async def search_apps(
     for app, _ in apps_with_scores:
         if query_params.include_functions:
             functions = [
-                BasicFunctionDefinition(name=function.name, description=function.description)
+                BasicFunctionDefinition(name=function.name, description=function.description, tags=function.tags)
                 for function in app.functions
             ]
             apps.append(AppBasic(name=app.name, description=app.description, functions=functions))
@@ -134,8 +134,8 @@ async def search_apps(
 
 @router.get("/{app_name}", response_model_exclude_none=True)
 async def get_app_details(
-    context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
-    app_name: str,
+        context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
+        app_name: str,
 ) -> AppDetails:
     """
     Returns an application (name, description, and functions).
@@ -152,18 +152,6 @@ async def get_app_details(
 
         raise AppNotFound(f"App={app_name} not found")
 
-    # filter functions by project visibility and active status
-    # TODO: better way and place for crud filtering/acl logic like this?
-    functions = [
-        function
-        for function in app.functions
-        if function.active
-        and not (
-            context.project.visibility_access == Visibility.PUBLIC
-            and function.visibility != Visibility.PUBLIC
-        )
-    ]
-
     app_details: AppDetails = AppDetails(
         id=app.id,
         name=app.name,
@@ -177,18 +165,19 @@ async def get_app_details(
         active=app.active,
         security_schemes=list(app.security_schemes.keys()),
         supported_security_schemes=SecuritySchemesPublic.model_validate(app.security_schemes),
-        functions=[FunctionDetails.model_validate(function) for function in functions],
         created_at=app.created_at,
         updated_at=app.updated_at,
     )
 
     return app_details
 
+
 @router.get("/{app_name}/functions", response_model_exclude_none=True)
 async def get_app_functions(
-    context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
-    app_name: str,
-) -> list[BasicFunctionDefinition]:
+        context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
+        app_name: str,
+        raw: bool = Query(False, description="Return raw functions without formatting"),
+) -> list[BasicFunctionDefinition] | list[FunctionDetails]:
     """
     Get all functions of an application.
     """
@@ -204,9 +193,17 @@ async def get_app_functions(
         raise AppNotFound(f"App={app_name} not found")
 
     functions = [
-        format_function_definition(function, format=FunctionDefinitionFormat.BASIC)
+        function
         for function in app.functions
-        if function.active and function.visibility == Visibility.PUBLIC
+        if function.active
+           and not (
+                context.project.visibility_access == Visibility.PUBLIC
+                and function.visibility != Visibility.PUBLIC
+        )
     ]
 
-    return functions
+    return [
+        format_function_definition(function,
+                                   format=FunctionDefinitionFormat.BASIC if not raw else FunctionDefinitionFormat.RAW)
+        for function in app.functions
+    ]

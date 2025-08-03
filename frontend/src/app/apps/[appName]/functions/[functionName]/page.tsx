@@ -3,19 +3,13 @@
 import React from "react";
 import { useParams } from "next/navigation";
 import { FunctionDetailContent } from "@/components/apps/function-detail-content";
-import { useApp } from "@/hooks/use-app";
-import { type AppFunction } from "@/lib/types/appfunction";
+import { useAppFunction } from "@/hooks/use-app-functions";
 
 const FunctionDetailPage = () => {
-  const { appName, functionName } = useParams<{
-    appName: string;
+  const { functionName } = useParams<{
     functionName: string;
   }>();
-  const { app } = useApp(appName);
-
-  const func = app?.functions?.find(
-    (f: AppFunction) => f.name === decodeURIComponent(functionName),
-  );
+  const { data: func } = useAppFunction(functionName);
 
   if (!func) {
     return (
