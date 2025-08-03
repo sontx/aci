@@ -1,16 +1,7 @@
 "use client";
 import ReactJsonView from "@microlink/react-json-view";
 import * as React from "react";
-import { useState, useMemo } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { useMemo, useState } from "react";
 import { type AppFunction } from "@/lib/types/appfunction";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -20,8 +11,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { IdDisplay } from "@/components/apps/id-display";
 
-interface FunctionDetailProps {
+interface FunctionDetailContentProps {
   func: AppFunction;
 }
 
@@ -155,7 +148,7 @@ function formatFunctionDefinition(
   }
 }
 
-export function FunctionDetail({ func }: FunctionDetailProps) {
+export function FunctionDetailContent({ func }: FunctionDetailContentProps) {
   const [selectedFormat, setSelectedFormat] =
     useState<FunctionDefinitionFormat>(FunctionDefinitionFormat.OPENAI);
 
@@ -169,63 +162,82 @@ export function FunctionDetail({ func }: FunctionDetailProps) {
   };
 
   return (
-    <Dialog>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          See Details
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-[60vw] max-h-[95vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Function Details</DialogTitle>
-        </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="space-y-4">
-            <div className="space-y-1">
-              <div className="text-sm font-medium text-muted-foreground">
-                Function Name
-              </div>
-              <div className="w-fit bg-muted px-2 py-1 rounded-md">
-                {func.name}
-              </div>
-            </div>
-            <div className="space-y-1">
-              <div className="text-sm font-medium text-muted-foreground">
-                Description
-              </div>
-              <div className="bg-muted px-2 py-1 rounded-md">
-                {func.description}
-              </div>
-            </div>
+    <div className="grid gap-6">
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <div className="text-sm font-medium text-muted-foreground">
+            Function Name
           </div>
+          <div className="w-fit">
+            <IdDisplay id={func.name} dim={false} />
+          </div>
+        </div>
 
+        {func.tags && func.tags.length > 0 && (
           <div className="space-y-2">
             <div className="text-sm font-medium text-muted-foreground">
-              Function Definition Format
+              Tags
             </div>
-            <Select value={selectedFormat} onValueChange={handleFormatChange}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select Function Definition Format" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={FunctionDefinitionFormat.OPENAI}>
-                  OpenAI Completion
-                </SelectItem>
-                <SelectItem value={FunctionDefinitionFormat.OPENAI_RESPONSES}>
-                  OpenAI Responses
-                </SelectItem>
-                <SelectItem value={FunctionDefinitionFormat.ANTHROPIC}>
-                  Anthropic
-                </SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex flex-wrap gap-2">
+              {func.tags.map((tag: string) => (
+                <Badge key={tag} variant="normal">
+                  {tag}
+                </Badge>
+              ))}
+            </div>
           </div>
-          <ScrollArea className="h-96 rounded-md border p-4">
-            <ReactJsonView name={false} src={formattedDefinition} />
-          </ScrollArea>
+        )}
+
+        <div className="space-y-2">
+          <div className="text-sm font-medium text-muted-foreground">
+            Description
+          </div>
+          <div className="bg-muted px-4 py-3 rounded-md">
+            {func.description}
+          </div>
         </div>
-        <DialogFooter></DialogFooter>
-      </DialogContent>
-    </Dialog>
+      </div>
+
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <div className="text-sm font-medium text-muted-foreground">
+            Function Definition Format
+          </div>
+          <Select value={selectedFormat} onValueChange={handleFormatChange}>
+            <SelectTrigger className="w-full max-w-xs">
+              <SelectValue placeholder="Select Function Definition Format" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={FunctionDefinitionFormat.OPENAI}>
+                OpenAI Completion
+              </SelectItem>
+              <SelectItem value={FunctionDefinitionFormat.OPENAI_RESPONSES}>
+                OpenAI Responses
+              </SelectItem>
+              <SelectItem value={FunctionDefinitionFormat.ANTHROPIC}>
+                Anthropic
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <div className="text-sm font-medium text-muted-foreground">
+            Function Definition
+          </div>
+          <div className="border rounded-md">
+            <ScrollArea className="h-96 p-4">
+              <ReactJsonView
+                name={false}
+                src={formattedDefinition}
+                theme="rjv-default"
+                displayDataTypes={false}
+                displayObjectSize={false}
+              />
+            </ScrollArea>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

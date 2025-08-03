@@ -1,6 +1,5 @@
 "use client";
 
-import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { GoPlus } from "react-icons/go";
 import { AlertCircle, Loader2 } from "lucide-react";
@@ -9,28 +8,11 @@ import { EnhancedDataTable } from "@/components/ui-extensions/enhanced-data-tabl
 import { useMCPServers } from "@/hooks/use-mcp-server";
 import { useMCPServersTableColumns } from "@/components/mcpserver/useMCPServersTableColumns";
 import { MCPServerForm } from "@/components/mcpserver/mcp-server-form";
-import { useApps } from "@/hooks/use-app";
-import { App } from "@/lib/types/app";
 
 export default function MCPServersPage() {
   const { data: mcpServers, isPending, isError } = useMCPServers();
-  const { data: apps = [] } = useApps();
 
-  const appsMap = useMemo(
-    () =>
-      apps.reduce(
-        (acc, app) => {
-          acc[app.name] = app;
-          return acc;
-        },
-        {} as Record<string, App>,
-      ),
-    [apps],
-  );
-
-  const columns = useMCPServersTableColumns({
-    appsMap,
-  });
+  const columns = useMCPServersTableColumns();
 
   return (
     <div>
@@ -39,7 +21,8 @@ export default function MCPServersPage() {
           <div>
             <h1 className="text-2xl font-bold">MCP Servers</h1>
             <p className="text-sm text-muted-foreground">
-              Manage your Model Context Protocol servers and their configurations.
+              Manage your Model Context Protocol servers and their
+              configurations.
             </p>
           </div>
           <MCPServerForm title="Create MCP Server">
@@ -68,9 +51,9 @@ export default function MCPServersPage() {
             columns={columns}
             data={mcpServers || []}
             searchBarProps={{ placeholder: "Search MCP servers..." }}
-            paginationOptions={{ 
-              initialPageIndex: 0, 
-              initialPageSize: 15 
+            paginationOptions={{
+              initialPageIndex: 0,
+              initialPageSize: 15,
             }}
           />
         )}

@@ -1,35 +1,39 @@
 import { useMemo } from "react";
-import { createColumnHelper, type ColumnDef } from "@tanstack/react-table";
+import { type ColumnDef, createColumnHelper } from "@tanstack/react-table";
 import { type AppConfig } from "@/lib/types/appconfig";
 import { EnhancedSwitch } from "@/components/ui-extensions/enhanced-switch/enhanced-switch";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { GoTrash } from "react-icons/go";
 import { App } from "@/lib/types/app";
-import Image from "next/image";
-import { useUpdateAppConfig, useDeleteAppConfig } from "@/hooks/use-app-config";
+import { useDeleteAppConfig, useUpdateAppConfig } from "@/hooks/use-app-config";
 import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
+  AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogDescription,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { ArrowUpDown, Eye } from "lucide-react";
+import { AppItemDisplay } from "@/components/apps/app-item-display";
+import { Badge } from "@/components/ui/badge";
+
 const columnHelper = createColumnHelper<AppConfig>();
 
 interface AppConfigsTableColumnsProps {
   linkedAccountsCountMap: Record<string, number>;
+  mcpServersCountMap: Record<string, number>;
   appsMap: Record<string, App>;
 }
 
 export const useAppConfigsTableColumns = ({
   linkedAccountsCountMap,
+  mcpServersCountMap,
   appsMap,
 }: AppConfigsTableColumnsProps): ColumnDef<AppConfig>[] => {
   const updateAppConfigMutation = useUpdateAppConfig();
@@ -47,49 +51,34 @@ export const useAppConfigsTableColumns = ({
               }
               className="w-full justify-start px-0"
             >
-              APP NAME
+              App Name
               <ArrowUpDown className="h-4 w-4" />
             </Button>
           </div>
         ),
         cell: (info) => {
           const appName = info.getValue();
-          return (
-            <Link
-              href={`/apps/${appName}`}
-              className="flex items-center gap-3 cursor-pointer hover:text-blue-600 hover:underline"
-            >
-              <div className="relative h-5 w-5 flex-shrink-0 overflow-hidden">
-                {appsMap[appName]?.logo && (
-                  <Image
-                    src={appsMap[appName]?.logo || ""}
-                    alt={`${appName} logo`}
-                    fill
-                    className="object-contain"
-                  />
-                )}
-              </div>
-              {appName}
-            </Link>
-          );
+          return <AppItemDisplay appName={appName} />;
         },
         enableGlobalFilter: true,
       }),
 
       columnHelper.accessor((row) => appsMap[row.app_name]?.categories || [], {
         id: "categoriesDisplay",
-        header: "CATEGORIES",
+        header: "Categories",
         cell: (info) => {
           const categories = info.getValue();
           return (
-            <div className="flex flex-wrap gap-2 overflow-hidden">
+            <div className="flex gap-2">
               {categories.map((category: string) => (
-                <span
+                <Badge
                   key={category}
-                  className="rounded-md bg-gray-100 px-3 py-1 text-sm font-medium text-gray-600 border border-gray-200"
+                  variant="normal"
+                  className="text-nowrap"
+                  // className="rounded-md bg-gray-100 px-3 py-1 text-xs text-nowrap font-medium text-gray-600 border border-gray-200"
                 >
                   {category}
-                </span>
+                </Badge>
               ))}
             </div>
           );
@@ -97,6 +86,29 @@ export const useAppConfigsTableColumns = ({
         enableColumnFilter: true,
         filterFn: "arrIncludes",
       }),
+
+      columnHelper.accessor(
+        (row) => mcpServersCountMap[row.app_name] || 0,
+        {
+          id: "mcpServers",
+          header: ({ column }) => (
+            <div className="text-left">
+              <Button
+                variant="ghost"
+                onClick={() =>
+                  column.toggleSorting(column.getIsSorted() === "asc")
+                }
+                className="w-full justify-start px-0"
+              >
+                MCP Servers
+                <ArrowUpDown className="h-4 w-4" />
+              </Button>
+            </div>
+          ),
+          cell: (info) => info.getValue(),
+          enableGlobalFilter: false,
+        },
+      ),
 
       columnHelper.accessor(
         (row) => linkedAccountsCountMap[row.app_name] || 0,
@@ -111,7 +123,7 @@ export const useAppConfigsTableColumns = ({
                 }
                 className="w-full justify-start px-0"
               >
-                LINKED ACCOUNTS
+                Linked Accounts
                 <ArrowUpDown className="h-4 w-4" />
               </Button>
             </div>
@@ -122,7 +134,7 @@ export const useAppConfigsTableColumns = ({
       ),
 
       columnHelper.accessor("enabled", {
-        header: "ENABLED",
+        header: "Enabled",
         cell: (info) => {
           const config = info.row.original;
           return (

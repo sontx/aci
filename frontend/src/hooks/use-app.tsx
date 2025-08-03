@@ -2,6 +2,8 @@ import { useMetaInfo } from "@/components/context/metainfo";
 import { getAllApps } from "@/lib/api/app";
 import { getApiKey } from "@/lib/api/util";
 import { useQuery } from "@tanstack/react-query";
+import { App } from "@/lib/types/app";
+import { useMemo } from "react";
 
 export const appKeys = {
   all: ["apps"] as const,
@@ -29,4 +31,19 @@ export function useApp(appName: string) {
     app: query.data?.[0],
     ...query,
   };
+}
+
+export function useAppsMap() {
+  const { data: apps = [] } = useApps();
+  return useMemo(
+    () =>
+      apps.reduce(
+        (acc, app) => {
+          acc[app.name] = app;
+          return acc;
+        },
+        {} as Record<string, App>,
+      ),
+    [apps],
+  );
 }

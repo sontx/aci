@@ -2,32 +2,24 @@
 
 import { useMemo } from "react";
 import { Separator } from "@/components/ui/separator";
-import { App } from "@/lib/types/app";
 import { useAppConfigsTableColumns } from "@/components/appconfig/useAppConfigsTableColumns";
 import { EnhancedDataTable } from "@/components/ui-extensions/enhanced-data-table/data-table";
-import { useApps } from "@/hooks/use-app";
+import { useAppsMap } from "@/hooks/use-app";
 import { useAppConfigs } from "@/hooks/use-app-config";
 import { useLinkedAccounts } from "@/hooks/use-linked-account";
+import { useMCPServers } from "@/hooks/use-mcp-server";
 
 export default function AppConfigPage() {
   const { data: appConfigs = [], isPending: isConfigsPending } =
     useAppConfigs();
-  const { data: apps = [] } = useApps();
   const { data: linkedAccounts = [], isPending: isLinkedAccountsPending } =
     useLinkedAccounts();
-  const isLoading = isConfigsPending || isLinkedAccountsPending;
+  const { data: mcpServers = [], isPending: isMCPServersPending } =
+    useMCPServers();
+  const isLoading =
+    isConfigsPending || isLinkedAccountsPending || isMCPServersPending;
+  const appsMap = useAppsMap();
 
-  const appsMap = useMemo(
-    () =>
-      apps.reduce(
-        (acc, app) => {
-          acc[app.name] = app;
-          return acc;
-        },
-        {} as Record<string, App>,
-      ),
-    [apps],
-  );
   const linkedAccountsCountMap = useMemo(() => {
     return linkedAccounts.reduce(
       (countMap, linkedAccount) => {
@@ -39,8 +31,22 @@ export default function AppConfigPage() {
       {} as Record<string, number>,
     );
   }, [linkedAccounts]);
+
+  const mcpServersCountMap = useMemo(() => {
+    return mcpServers.reduce(
+      (countMap, mcpServer) => {
+        const appName = mcpServer.app_name;
+        const previousCount = countMap[appName] ?? 0;
+        countMap[appName] = previousCount + 1;
+        return countMap;
+      },
+      {} as Record<string, number>,
+    );
+  }, [mcpServers]);
+
   const appConfigsColumns = useAppConfigsTableColumns({
     linkedAccountsCountMap,
+    mcpServersCountMap,
     appsMap,
   });
 

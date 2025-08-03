@@ -4,9 +4,6 @@ import { MCPServerResponse } from "@/lib/types/mcpserver";
 import { Button } from "@/components/ui/button";
 import { GoTrash } from "react-icons/go";
 import { Badge } from "@/components/ui/badge";
-import Image from "next/image";
-import { IdDisplay } from "@/components/apps/id-display";
-import { App } from "@/lib/types/app";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,62 +17,44 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { useDeleteMCPServer } from "@/hooks/use-mcp-server";
-import Link from "next/link";
+import { AppItemDisplay } from "@/components/apps/app-item-display";
+import { RouterLink } from "@/components/ui/router-link";
+import { formatToLocalTime } from "@/utils/time";
 
 const columnHelper = createColumnHelper<MCPServerResponse>();
 
-interface MCPServersTableColumnsProps {
-  appsMap: Record<string, App>;
-}
-
-export const useMCPServersTableColumns = ({
-  appsMap,
-}: MCPServersTableColumnsProps): ColumnDef<MCPServerResponse>[] => {
+export const useMCPServersTableColumns = (): ColumnDef<MCPServerResponse>[] => {
   const { mutateAsync: deleteMCPServer } = useDeleteMCPServer();
 
   return useMemo(
     () => [
       columnHelper.accessor("name", {
-        header: "NAME",
+        header: "Name",
         cell: (info) => {
           const server = info.row.original;
           return (
-            <Link
-              className="cursor-pointer hover:text-blue-600 hover:underline"
+            <RouterLink
               href={`/mcp-servers/${server.id}`}
+              className="text-nowrap"
             >
               {info.getValue()}
-            </Link>
+            </RouterLink>
           );
         },
         enableGlobalFilter: true,
       }) as ColumnDef<MCPServerResponse>,
 
       columnHelper.accessor("app_name", {
-        header: "APP",
+        header: "App",
         cell: (info) => {
           const appName = info.getValue();
-          return (
-            <div className="flex items-center gap-3">
-              <div className="relative h-5 w-5 flex-shrink-0 overflow-hidden">
-                {appsMap[appName]?.logo && (
-                  <Image
-                    src={appsMap[appName]?.logo || ""}
-                    alt={`${appName} logo`}
-                    fill
-                    className="object-contain"
-                  />
-                )}
-              </div>
-              <IdDisplay id={appName} dim={false} />
-            </div>
-          );
+          return <AppItemDisplay appName={appName} />;
         },
         enableGlobalFilter: true,
       }) as ColumnDef<MCPServerResponse>,
 
       columnHelper.accessor("auth_type", {
-        header: "AUTH TYPE",
+        header: "Auth Type",
         cell: (info) => (
           <Badge variant="outline" className="text-xs">
             {info.getValue()}
@@ -85,10 +64,10 @@ export const useMCPServersTableColumns = ({
       }) as ColumnDef<MCPServerResponse>,
 
       columnHelper.accessor("created_at", {
-        header: "CREATED",
+        header: "Created At",
         cell: (info) => (
-          <div className="text-sm text-muted-foreground">
-            {new Date(info.getValue()).toLocaleDateString()}
+          <div className="text-nowrap">
+            {formatToLocalTime(info.getValue())}
           </div>
         ),
         enableGlobalFilter: false,
@@ -143,6 +122,6 @@ export const useMCPServersTableColumns = ({
         enableGlobalFilter: false,
       }) as ColumnDef<MCPServerResponse>,
     ],
-    [deleteMCPServer, appsMap],
+    [deleteMCPServer],
   );
 };

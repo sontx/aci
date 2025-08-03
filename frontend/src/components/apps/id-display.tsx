@@ -9,13 +9,15 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { RouterLink } from "@/components/ui/router-link";
 
 interface IdDisplayProps {
   id: string;
   dim?: boolean;
+  href?: string;
 }
 
-export function IdDisplay({ id, dim = true }: IdDisplayProps) {
+export function IdDisplay({ id, href, dim = true }: IdDisplayProps) {
   const copyToClipboard = () => {
     if (!navigator.clipboard) {
       console.error("Clipboard API not supported");
@@ -33,18 +35,22 @@ export function IdDisplay({ id, dim = true }: IdDisplayProps) {
       });
   };
 
+  const ID = (
+    <span
+      className={`text-sm ${
+        dim && "text-gray-500"
+      } truncate min-w-0 cursor-default`}
+    >
+      {id}
+    </span>
+  );
+
   return (
     <TooltipProvider>
       <div className="flex items-center w-full gap-1">
         <Tooltip>
           <TooltipTrigger asChild>
-            <span
-              className={`text-sm ${
-                dim ? "text-gray-500" : "text-gray-800"
-              } truncate min-w-0 cursor-default`}
-            >
-              {id}
-            </span>
+            {href ? <RouterLink href={href}>{ID}</RouterLink> : ID}
           </TooltipTrigger>
           <TooltipContent>
             <p>{id}</p>
@@ -58,7 +64,6 @@ export function IdDisplay({ id, dim = true }: IdDisplayProps) {
                 copyToClipboard();
               }}
               className="text-gray-500 hover:text-gray-700"
-              aria-label="Copy app ID"
             >
               <BiCopy />
             </button>

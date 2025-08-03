@@ -143,7 +143,10 @@ export function AppGrid({ apps }: AppGridProps) {
           className="max-w-sm"
         />
 
-        <Select onValueChange={setSelectedCategory}>
+        <Select
+          onValueChange={setSelectedCategory}
+          defaultValue={FilterCategory.ALL}
+        >
           <SelectTrigger className="w-[160px]">
             <SelectValue placeholder="all" />
           </SelectTrigger>
@@ -163,7 +166,7 @@ export function AppGrid({ apps }: AppGridProps) {
           </SelectContent>
         </Select>
 
-        <Select onValueChange={setSortOrder}>
+        <Select onValueChange={setSortOrder} defaultValue={SortOption.DEFAULT}>
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="Default" />
           </SelectTrigger>

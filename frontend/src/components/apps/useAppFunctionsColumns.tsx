@@ -1,19 +1,27 @@
 "use client";
 
-import { FunctionDetail } from "@/components/apps/function-detail";
 import { type AppFunction } from "@/lib/types/appfunction";
 import { useMemo } from "react";
 import { IdDisplay } from "@/components/apps/id-display";
-import { createColumnHelper, type ColumnDef } from "@tanstack/react-table";
+import { type ColumnDef, createColumnHelper } from "@tanstack/react-table";
+import { Badge } from "@/components/ui/badge";
+import { useParams } from "next/navigation";
 
 const columnHelper = createColumnHelper<AppFunction>();
 
 export const useAppFunctionsColumns = (): ColumnDef<AppFunction>[] => {
+  const { appName } = useParams<{ appName: string }>();
   return useMemo(() => {
     return [
       columnHelper.accessor("name", {
-        header: "FUNCTION NAME",
-        cell: (info) => <IdDisplay id={info.getValue()} dim={false} />,
+        header: "Function Name",
+        cell: (info) => (
+          <IdDisplay
+            href={`/apps/${appName}/functions/${encodeURIComponent(info.getValue())}`}
+            id={info.getValue()}
+            dim={false}
+          />
+        ),
         enableGlobalFilter: true,
         size: 50,
         /** Column ID needed for default sorting */
@@ -24,17 +32,20 @@ export const useAppFunctionsColumns = (): ColumnDef<AppFunction>[] => {
         },
       }),
 
+      columnHelper.accessor("description", {
+        header: "Description",
+        cell: (info) => <div className="max-w-[500px]">{info.getValue()}</div>,
+        enableGlobalFilter: true,
+      }),
+
       columnHelper.accessor("tags", {
-        header: "TAGS",
+        header: "Tags",
         cell: (info) => (
           <div className="flex flex-wrap gap-2 overflow-hidden">
             {(info.getValue() || []).map((tag: string) => (
-              <span
-                key={tag}
-                className="rounded-md bg-gray-100 px-3 py-1 text-sm font-medium text-gray-600 border border-gray-200"
-              >
+              <Badge key={tag} variant="normal">
                 {tag}
-              </span>
+              </Badge>
             ))}
           </div>
         ),
@@ -43,23 +54,6 @@ export const useAppFunctionsColumns = (): ColumnDef<AppFunction>[] => {
         filterFn: "arrIncludes",
         enableColumnFilter: true,
       }),
-
-      columnHelper.accessor("description", {
-        header: "DESCRIPTION",
-        cell: (info) => <div className="max-w-[500px]">{info.getValue()}</div>,
-        enableGlobalFilter: true,
-      }),
-
-      columnHelper.accessor((row) => row, {
-        id: "details",
-        header: () => <div className="text-center">DETAILS</div>,
-        cell: (info) => (
-          <div className="text-center">
-            <FunctionDetail func={info.getValue()} />
-          </div>
-        ),
-        enableGlobalFilter: false,
-      }),
     ] as ColumnDef<AppFunction>[];
-  }, []);
+  }, [appName]);
 };
