@@ -15,8 +15,12 @@ export interface AppSearch extends PaginationParams {
   categories?: string[];
 }
 
-export async function getAllApps(): Promise<App[]> {
-  const response = await axiosInstance.get("/v1/apps");
+export async function getAllApps(appNames?: string[]): Promise<App[]> {
+  const response = await axiosInstance.get("/v1/apps", {
+    params: {
+      app_names: appNames,
+    },
+  });
   return response.data;
 }
 
@@ -41,8 +45,8 @@ export async function getApps(appNames: string[]): Promise<App[]> {
 }
 
 export async function getApp(appName: string): Promise<App | null> {
-  const apps = await getApps([appName]);
-  return apps.length > 0 ? apps[0] : null;
+  const response = await axiosInstance.get<App>(`/v1/apps/${appName}`);
+  return response.data;
 }
 
 export async function getAppFunctions(

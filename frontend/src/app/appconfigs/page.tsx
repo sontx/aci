@@ -18,7 +18,7 @@ export default function AppConfigPage() {
     useMCPServers();
   const isLoading =
     isConfigsPending || isLinkedAccountsPending || isMCPServersPending;
-  const appsMap = useAppsMap();
+  const appsMap = useAppsMap(appConfigs.map((config) => config.app_name));
 
   const linkedAccountsCountMap = useMemo(() => {
     return linkedAccounts.reduce(

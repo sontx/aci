@@ -1,7 +1,7 @@
 import type { App } from "@/lib/types/app";
 import { AppConfig } from "@/lib/types/appconfig";
 import Image from "next/image";
-import { useAppsMap } from "@/hooks/use-app";
+import { useApp } from "@/hooks/use-app";
 import { RouterLink } from "@/components/ui-extensions/router-link";
 
 interface AppItemDisplayProps {
@@ -12,7 +12,10 @@ interface AppItemDisplayProps {
 
 function AppItemWithApp({ app }: { app: App }) {
   return (
-    <RouterLink href={`/apps/${app.name}`} className="flex items-center gap-3 text-nowrap">
+    <RouterLink
+      href={`/apps/${app.name}`}
+      className="flex items-center gap-3 text-nowrap"
+    >
       <div className="relative h-5 w-5 flex-shrink-0 overflow-hidden">
         {app.logo && (
           <Image
@@ -29,8 +32,7 @@ function AppItemWithApp({ app }: { app: App }) {
 }
 
 function AppItemWithAppName({ appName }: { appName: string }) {
-  const appsMap = useAppsMap();
-  const app = appsMap[appName];
+  const { data: app } = useApp(appName);
   return app && <AppItemWithApp app={app} />;
 }
 

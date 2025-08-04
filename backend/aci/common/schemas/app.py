@@ -2,10 +2,9 @@ import re
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from aci.common.enums import SecurityScheme, Visibility
-from aci.common.schemas.function import BasicFunctionDefinition, FunctionDetails
 from aci.common.schemas.security_scheme import (
     APIKeyScheme,
     APIKeySchemeCredentials,
@@ -58,6 +57,19 @@ class AppUpsert(BaseModel, extra="forbid"):
                     scheme_config, NoAuthScheme
             ):
                 raise ValueError(f"Invalid configuration for NO_AUTH scheme: {scheme_config}")
+        return v
+
+
+class AppList(BaseModel):
+    app_names: list[str] | None = Field(default=None, description="List of app names to filter by.")
+
+    # Remove empty strings from the list
+    @field_validator("app_names")
+    def validate_app_names(cls, v: list[str] | None) -> list[str]:
+        if v is not None:
+            v = [app_name for app_name in v if app_name.strip()]
+            if not v:
+                return None
         return v
 
 

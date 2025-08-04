@@ -2,6 +2,7 @@ import {
   AppSearch,
   getAllApps,
   getAllCategories,
+  getApp,
   searchApps,
 } from "@/lib/api/app";
 import { useQuery } from "@tanstack/react-query";
@@ -9,21 +10,17 @@ import { App } from "@/lib/types/app";
 import { useMemo } from "react";
 
 export const appKeys = {
-  all: ["apps"] as const,
+  queryApps: (appNames?: string[]) =>
+    appNames?.length ? ["apps", ...appNames.sort()] : (["apps"] as const),
   allCategories: ["categories"] as const,
   search: (params: AppSearch) => ["apps", "search", params] as const,
+  queryApp: (appName: string) => ["app", appName],
 };
 
 export function useApps(appNames?: string[]) {
   return useQuery({
-    queryKey: appKeys.all,
-    queryFn: () => getAllApps(),
-    select: (data) => {
-      if (!appNames || appNames.length === 0) {
-        return data;
-      }
-      return data.filter((app) => appNames.includes(app.name));
-    },
+    queryKey: appKeys.queryApps(appNames),
+    queryFn: () => getAllApps(appNames),
   });
 }
 
@@ -42,15 +39,15 @@ export function useSearchApps(params: AppSearch) {
 }
 
 export function useApp(appName: string) {
-  const query = useApps([appName]);
-  return {
-    app: query.data?.[0],
-    ...query,
-  };
+  return useQuery({
+    queryKey: appKeys.queryApp(appName),
+    queryFn: () => getApp(appName),
+    enabled: !!appName,
+  });
 }
 
-export function useAppsMap() {
-  const { data: apps = [] } = useApps();
+export function useAppsMap(appNames?: string[]) {
+  const { data: apps = [] } = useApps(appNames);
   return useMemo(
     () =>
       apps.reduce(

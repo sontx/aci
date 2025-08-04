@@ -8,6 +8,9 @@ import {
 const axiosInstance = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL,
   timeout: 10000,
+  paramsSerializer: {
+    indexes: null, // ensures `q=apple&q=banana&q=cherry`
+  },
 });
 
 // Token injection via request interceptor

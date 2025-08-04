@@ -8,7 +8,7 @@ from aci.common.exceptions import AppNotFound
 from aci.common.logging_setup import get_logger
 from aci.common.schemas.app import (
     AppDetails,
-    AppsSearch,
+    AppsSearch, AppList,
 )
 from aci.common.schemas.common import Paged
 from aci.common.schemas.function import BasicFunctionDefinition, FunctionDetails
@@ -24,6 +24,7 @@ router = APIRouter()
 @router.get("", response_model_exclude_none=True)
 async def list_apps(
         context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
+        query_params: Annotated[AppList, Query()],
 ) -> list[AppDetails]:
     """
     Get a list of Apps and their details. Sorted by App name.
@@ -32,7 +33,7 @@ async def list_apps(
     cache_key = "apps:list"
     cached = await cache.get(cache_key)
     if cached is not None:
-        return cached
+        return filter_apps_by_names(cached, query_params.app_names)
 
     apps = crud.apps.get_apps(
         context.db_session,
@@ -49,7 +50,24 @@ async def list_apps(
         response.append(app_details)
 
     await cache.set(cache_key, response)
-    return response
+
+    return filter_apps_by_names(response, query_params.app_names)
+
+
+def filter_apps_by_names(
+        all_apps: list[AppDetails],
+        app_names: list[str] | None,
+) -> list[AppDetails]:
+    """
+    Filter the list of AppDetails by a list of app names.
+    """
+    if not app_names:
+        logger.info("No app names provided, returning all apps.")
+        return all_apps
+
+    logger.info(f"Filtering apps by names: {app_names}")
+    filtered_apps = [app for app in all_apps if app.name in app_names]
+    return filtered_apps
 
 
 @router.get("/search", response_model_exclude_none=True)
@@ -57,7 +75,7 @@ async def search_apps(
         context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
         query_params: Annotated[AppsSearch, Query()],
 ) -> Paged[AppDetails]:
-    all_apps = await list_apps(context)
+    all_apps = await list_apps(context, query_params=AppList(app_names=None))
     search = query_params.search
     categories = query_params.categories
     limit = query_params.limit
@@ -86,7 +104,7 @@ async def get_all_categories(
     if cached_categories is not None:
         return cached_categories
 
-    all_apps = await list_apps(context)
+    all_apps = await list_apps(context, query_params=AppList(app_names=None))
     # Get unique categories from all apps
     categories = set()
     for app in all_apps:

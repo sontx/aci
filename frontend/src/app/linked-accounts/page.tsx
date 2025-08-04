@@ -19,7 +19,11 @@ export default function LinkedAccountsPage() {
     useLinkedAccounts();
   const { data: appConfigs = [], isPending: isConfigsPending } =
     useAppConfigs();
-  const { data: apps, isPending: isAppsPending, isError } = useApps();
+  const {
+    data: apps,
+    isPending: isAppsPending,
+    isError,
+  } = useApps(appConfigs.map((config) => config.app_name));
   const { mutateAsync: updateLinkedAccount } = useUpdateLinkedAccount();
 
   const toggleAccountStatus = useCallback(
@@ -40,7 +44,8 @@ export default function LinkedAccountsPage() {
     [updateLinkedAccount],
   );
 
-  const linkedAccountsColumns = useLinkedAccountsTableColumns(toggleAccountStatus);
+  const linkedAccountsColumns =
+    useLinkedAccountsTableColumns(toggleAccountStatus);
 
   const isPageLoading =
     isLinkedAccountsPending || isAppsPending || isConfigsPending;
