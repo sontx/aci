@@ -15,6 +15,7 @@ from aci.common.logging_setup import setup_logging
 from aci.server import config
 from aci.server import dependencies as deps
 from aci.server.acl import get_propelauth
+from aci.server.caching import configure_cache_from_env
 from aci.server.dependency_check import check_dependencies
 from aci.server.log_schema_filter import LogSchemaFilter
 from aci.server.middleware.interceptor import InterceptorMiddleware, RequestContextFilter
@@ -38,12 +39,14 @@ check_dependencies()
 
 setup_sentry()
 
+configure_cache_from_env()
+
 setup_logging(
-    formatter=JsonFormatter(
-        "{levelname} {asctime} {name} {message}",
-        style="{",
-        rename_fields={"asctime": "timestamp", "name": "file", "levelname": "level"},
-    ),
+    # formatter=JsonFormatter(
+    #     "{levelname} {asctime} {name} {message}",
+    #     style="{",
+    #     rename_fields={"asctime": "timestamp", "name": "file", "levelname": "level"},
+    # ),
     filters=[RequestContextFilter(), LogSchemaFilter()],
     environment=config.ENVIRONMENT,
 )

@@ -92,44 +92,6 @@ def get_apps(
     return list(db_session.execute(statement).scalars().all())
 
 
-def search_apps(
-    db_session: Session,
-    public_only: bool,
-    active_only: bool,
-    app_names: list[str] | None,
-    categories: list[str] | None,
-    limit: int,
-    offset: int,
-) -> list[tuple[App, float | None]]:
-    """Get a list of apps with optional filtering by categories and sorting by vector similarity to intent. and pagination."""
-    statement = select(App)
-
-    # filter out private apps
-    if public_only:
-        statement = statement.filter(App.visibility == Visibility.PUBLIC)
-
-    # filter out inactive apps
-    if active_only:
-        statement = statement.filter(App.active)
-
-    # filter out apps by app_names
-    if app_names is not None:
-        statement = statement.filter(App.name.in_(app_names))
-
-    # filter out apps by categories
-    # TODO: Is there any way to get typing for cosine_distance, label, overlap?
-    if categories is not None:
-        statement = statement.filter(App.categories.overlap(categories))
-
-    statement = statement.offset(offset).limit(limit)
-
-    logger.debug(f"Executing statement, statement={statement}")
-
-    results = db_session.execute(statement).all()
-
-    return [(app, None) for (app,) in results]
-
-
 def set_app_active_status(db_session: Session, app_name: str, active: bool) -> None:
     statement = update(App).filter_by(name=app_name).values(active=active)
     db_session.execute(statement)

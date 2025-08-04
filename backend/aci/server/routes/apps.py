@@ -7,14 +7,14 @@ from aci.common.enums import Visibility, FunctionDefinitionFormat
 from aci.common.exceptions import AppNotFound
 from aci.common.logging_setup import get_logger
 from aci.common.schemas.app import (
-    AppBasic,
     AppDetails,
-    AppsList,
     AppsSearch,
 )
+from aci.common.schemas.common import Paged
 from aci.common.schemas.function import BasicFunctionDefinition, FunctionDetails
 from aci.common.schemas.security_scheme import SecuritySchemesPublic
 from aci.server import dependencies as deps
+from aci.server.caching import get_cache, PydanticCacheHelper
 from aci.server.utils import format_function_definition
 
 logger = get_logger(__name__)
@@ -24,41 +24,31 @@ router = APIRouter()
 @router.get("", response_model_exclude_none=True)
 async def list_apps(
         context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
-        query_params: Annotated[AppsList, Query()],
 ) -> list[AppDetails]:
     """
     Get a list of Apps and their details. Sorted by App name.
     """
+    cache = PydanticCacheHelper(AppDetails, many=True)
+    cache_key = "apps:list"
+    cached = await cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     apps = crud.apps.get_apps(
         context.db_session,
         context.project.visibility_access == Visibility.PUBLIC,
         True,
-        query_params.app_names,
-        query_params.limit,
-        query_params.offset,
+        None,
+        None,
+        None,
     )
 
     response: list[AppDetails] = []
     for app in apps:
-        app_details = AppDetails(
-            id=app.id,
-            name=app.name,
-            display_name=app.display_name,
-            provider=app.provider,
-            version=app.version,
-            description=app.description,
-            logo=app.logo,
-            categories=app.categories,
-            visibility=app.visibility,
-            active=app.active,
-            security_schemes=list(app.security_schemes.keys()),
-            # TODO: check validation latency
-            supported_security_schemes=SecuritySchemesPublic.model_validate(app.security_schemes),
-            created_at=app.created_at,
-            updated_at=app.updated_at,
-        )
+        app_details = to_app_details(app)
         response.append(app_details)
 
+    await cache.set(cache_key, response)
     return response
 
 
@@ -66,39 +56,47 @@ async def list_apps(
 async def search_apps(
         context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
         query_params: Annotated[AppsSearch, Query()],
-) -> list[AppBasic]:
-    """
-    Search for Apps.
-    """
-    # TODO: currently the search is done across all apps, we might want to add flags to account for below scenarios:
-    # - when clients search for apps, if an app is configured but disabled by client, should it be discoverable?
+) -> Paged[AppDetails]:
+    all_apps = await list_apps(context)
+    search = query_params.search
+    categories = query_params.categories
+    limit = query_params.limit
+    offset = query_params.offset
 
-    apps_with_scores = crud.apps.search_apps(
-        context.db_session,
-        context.project.visibility_access == Visibility.PUBLIC,
-        True,
-        None,
-        query_params.categories,
-        query_params.limit,
-        query_params.offset,
-    )
+    filtered_apps: list[AppDetails] = []
+    for app in all_apps:
+        if search and search.lower() not in app.name.lower() and search.lower() not in app.description.lower():
+            continue
+        if categories and not any(category in app.categories for category in categories):
+            continue
+        filtered_apps.append(app)
 
-    apps: list[AppBasic] = []
+    total = len(filtered_apps)
+    filtered_apps = filtered_apps[offset:offset + limit]
+    return Paged[AppDetails](total=total, items=filtered_apps)
 
-    for app, _ in apps_with_scores:
-        apps.append(AppBasic(name=app.name, description=app.description))
 
-    logger.info(
-        "Search apps result",
-        extra={
-            "search_apps": {
-                "query_params_json": query_params.model_dump_json(),
-                "app_names": [app.name for app, _ in apps_with_scores],
-            },
-        },
-    )
+@router.get("/categories", response_model_exclude_none=True)
+async def get_all_categories(
+        context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
+) -> list[str]:
+    cache = get_cache()
+    cache_key = "apps:categories"
+    cached_categories = await cache.get(cache_key)
+    if cached_categories is not None:
+        return cached_categories
 
-    return apps
+    all_apps = await list_apps(context)
+    # Get unique categories from all apps
+    categories = set()
+    for app in all_apps:
+        categories.update(app.categories)
+    # Convert set to sorted list
+    sorted_categories = sorted(categories)
+
+    await cache.set(cache_key, sorted_categories)
+
+    return sorted_categories
 
 
 @router.get("/{app_name}", response_model_exclude_none=True)
@@ -109,6 +107,13 @@ async def get_app_details(
     """
     Returns an application (name, description, and functions).
     """
+
+    cache = PydanticCacheHelper(AppDetails, many=False)
+    cache_key = f"apps:details:{app_name}"
+    cached_app = await cache.get(cache_key)
+    if cached_app is not None:
+        return cached_app
+
     app = crud.apps.get_app(
         context.db_session,
         app_name,
@@ -121,7 +126,16 @@ async def get_app_details(
 
         raise AppNotFound(f"App={app_name} not found")
 
-    app_details: AppDetails = AppDetails(
+    app_details = to_app_details(app)
+    await cache.set(cache_key, app_details)
+    return app_details
+
+
+def to_app_details(app) -> AppDetails:
+    """
+    Convert an app object to AppDetails schema.
+    """
+    return AppDetails(
         id=app.id,
         name=app.name,
         display_name=app.display_name,
@@ -138,8 +152,6 @@ async def get_app_details(
         updated_at=app.updated_at,
     )
 
-    return app_details
-
 
 @router.get("/{app_name}/functions", response_model_exclude_none=True)
 async def get_app_functions(
@@ -150,6 +162,13 @@ async def get_app_functions(
     """
     Get all functions of an application.
     """
+
+    cache = PydanticCacheHelper(BasicFunctionDefinition if not raw else FunctionDetails, many=True)
+    cache_key = f"apps:functions:{app_name}:{'raw' if raw else 'basic'}"
+    cached_functions = await cache.get(cache_key)
+    if cached_functions is not None:
+        return cached_functions
+
     app = crud.apps.get_app(
         context.db_session,
         app_name,
@@ -161,18 +180,12 @@ async def get_app_functions(
         logger.error(f"App not found, app_name={app_name}")
         raise AppNotFound(f"App={app_name} not found")
 
-    functions = [
-        function
-        for function in app.functions
-        if function.active
-           and not (
-                context.project.visibility_access == Visibility.PUBLIC
-                and function.visibility != Visibility.PUBLIC
-        )
-    ]
-
-    return [
+    app_functions = [
         format_function_definition(function,
                                    format=FunctionDefinitionFormat.BASIC if not raw else FunctionDefinitionFormat.RAW)
         for function in app.functions
     ]
+
+    await cache.set(cache_key, app_functions)
+
+    return app_functions

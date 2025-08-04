@@ -43,37 +43,31 @@ class AppUpsert(BaseModel, extra="forbid"):
 
     @field_validator("security_schemes")
     def validate_security_schemes(
-        cls, v: dict[SecurityScheme, APIKeyScheme | OAuth2Scheme]
+            cls, v: dict[SecurityScheme, APIKeyScheme | OAuth2Scheme]
     ) -> dict[SecurityScheme, APIKeyScheme | OAuth2Scheme]:
         for scheme_type, scheme_config in v.items():
             if scheme_type == SecurityScheme.API_KEY and not isinstance(
-                scheme_config, APIKeyScheme
+                    scheme_config, APIKeyScheme
             ):
                 raise ValueError(f"Invalid configuration for API_KEY scheme: {scheme_config}")
             elif scheme_type == SecurityScheme.OAUTH2 and not isinstance(
-                scheme_config, OAuth2Scheme
+                    scheme_config, OAuth2Scheme
             ):
                 raise ValueError(f"Invalid configuration for OAUTH2 scheme: {scheme_config}")
             elif scheme_type == SecurityScheme.NO_AUTH and not isinstance(
-                scheme_config, NoAuthScheme
+                    scheme_config, NoAuthScheme
             ):
                 raise ValueError(f"Invalid configuration for NO_AUTH scheme: {scheme_config}")
         return v
 
+
 class AppsSearch(BaseModel):
     """
     Parameters for searching applications.
-    TODO: category enum?
-    TODO: filter by similarity score?
     """
-
-    intent: str | None = Field(
+    search: str | None = Field(
         default=None,
-        description="Natural language intent for vector similarity sorting. Results will be sorted by relevance to the intent.",
-    )
-    allowed_apps_only: bool = Field(
-        default=False,
-        description="If true, only return apps that are allowed by the accessor, identified by the api key.",
+        description="Search query to filter Apps by name or description.",
     )
     categories: list[str] | None = Field(
         default=None, description="List of categories for filtering."
@@ -94,32 +88,12 @@ class AppsSearch(BaseModel):
                 return None
         return v
 
-    # empty intent or string with spaces should be treated as None
-    @field_validator("intent")
-    def validate_intent(cls, v: str | None) -> str | None:
+    # empty search or string with spaces should be treated as None
+    @field_validator("search")
+    def validate_search(cls, v: str | None) -> str | None:
         if v is not None and v.strip() == "":
             return None
         return v
-
-
-class AppsList(BaseModel):
-    """
-    Parameters for listing Apps.
-    """
-
-    app_names: list[str] | None = Field(default=None, description="List of app names to filter by.")
-    limit: int = Field(
-        default=100, ge=1, le=1000, description="Maximum number of Apps per response."
-    )
-    offset: int = Field(default=0, ge=0, description="Pagination offset.")
-
-
-class AppBasic(BaseModel):
-    name: str
-    description: str
-    functions: list[BasicFunctionDefinition] | None = None
-
-    model_config = ConfigDict(from_attributes=True)
 
 
 class AppDetails(BaseModel):

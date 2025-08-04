@@ -38,6 +38,7 @@ dependencies = [
     "gunicorn>=23.0.0",
     "jsonref>=1.1.0",
     "propelauth-py>=4.2.6",
+    "aiocache[redis]>=0.12.3",
 ]
 
 [dependency-groups]
