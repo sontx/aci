@@ -8,7 +8,6 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { MetaInfoProvider } from "@/components/context/metainfo";
 import { Toaster } from "@/components/ui/sonner";
-import { Analytics } from "@vercel/analytics/next";
 import { RequiredAuthProvider } from "@propelauth/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
@@ -107,7 +106,6 @@ export default function RootLayout({
                   <main className="w-full h-full mr-2 border rounded-lg border-gray-400 border-opacity-30 bg-white">
                     <Header />
                     {children}
-                    <Analytics />
                   </main>
                 </SidebarInset>
               </SidebarProvider>
