@@ -1,6 +1,7 @@
 import { App } from "@/lib/types/app";
 import { AppFunction } from "@/lib/types/appfunction";
 import axiosInstance from "@/lib/axios";
+import { Paged, PaginationParams } from "./common";
 
 export interface BasicFunctionDefinition {
   name: string;
@@ -9,8 +10,23 @@ export interface BasicFunctionDefinition {
   display_name: string;
 }
 
+export interface AppSearch extends PaginationParams {
+  search?: string;
+  categories?: string[];
+}
+
 export async function getAllApps(): Promise<App[]> {
-  const response = await axiosInstance.get('/v1/apps');
+  const response = await axiosInstance.get("/v1/apps");
+  return response.data;
+}
+
+export async function searchApps(params: AppSearch): Promise<Paged<App>> {
+  const response = await axiosInstance.get("/v1/apps/search", { params });
+  return response.data;
+}
+
+export async function getAllCategories(): Promise<string[]> {
+  const response = await axiosInstance.get<string[]>("/v1/apps/categories");
   return response.data;
 }
 
@@ -34,7 +50,7 @@ export async function getAppFunctions(
   raw: boolean,
 ): Promise<BasicFunctionDefinition[] | AppFunction[]> {
   const response = await axiosInstance.get(
-    `/v1/apps/${appName}/functions?raw=${raw}`
+    `/v1/apps/${appName}/functions?raw=${raw}`,
   );
   return response.data;
 }

@@ -1,10 +1,17 @@
-import { getAllApps } from "@/lib/api/app";
+import {
+  AppSearch,
+  getAllApps,
+  getAllCategories,
+  searchApps,
+} from "@/lib/api/app";
 import { useQuery } from "@tanstack/react-query";
 import { App } from "@/lib/types/app";
 import { useMemo } from "react";
 
 export const appKeys = {
   all: ["apps"] as const,
+  allCategories: ["categories"] as const,
+  search: (params: AppSearch) => ["apps", "search", params] as const,
 };
 
 export function useApps(appNames?: string[]) {
@@ -17,6 +24,20 @@ export function useApps(appNames?: string[]) {
       }
       return data.filter((app) => appNames.includes(app.name));
     },
+  });
+}
+
+export function useCategories() {
+  return useQuery({
+    queryKey: appKeys.allCategories,
+    queryFn: () => getAllCategories(),
+  });
+}
+
+export function useSearchApps(params: AppSearch) {
+  return useQuery({
+    queryKey: appKeys.search(params),
+    queryFn: () => searchApps(params),
   });
 }
 
