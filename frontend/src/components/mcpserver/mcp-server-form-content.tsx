@@ -109,7 +109,7 @@ export function MCPServerFormContent({
         (config) => config.id === selectedAppConfigId,
       );
       if (selectedAppConfig) {
-        const generatedName = `${selectedAppConfig.app_name}-${generateRandomChars(4)}`;
+        const generatedName = `${selectedAppConfig.app_name.toLowerCase().replaceAll("_", "-")}-${generateRandomChars(4)}`;
         form.setValue("name", generatedName);
       }
     }

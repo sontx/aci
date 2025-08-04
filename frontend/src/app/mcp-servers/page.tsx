@@ -27,7 +27,7 @@ export default function MCPServersPage() {
           </div>
           <MCPServerForm title="Create MCP Server">
             <Button>
-              <GoPlus className="mr-2 h-4 w-4" />
+              <GoPlus className="h-4 w-4" />
               Create MCP Server
             </Button>
           </MCPServerForm>

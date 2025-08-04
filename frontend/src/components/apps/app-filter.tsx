@@ -42,10 +42,10 @@ export function AppFilter({
   return (
     <div className="flex items-center gap-3">
       <Input
-        placeholder="Search apps by name, description, or category..."
+        placeholder="Search apps by name or description..."
         value={searchQuery}
         onChange={(e) => onSearchChange(e.target.value)}
-        className="max-w-sm"
+        className="max-w-xs"
       />
 
       <Select
