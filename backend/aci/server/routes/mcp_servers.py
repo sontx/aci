@@ -87,6 +87,8 @@ async def create_mcp_server(
         allowed_tools=mcp_server_data.allowed_tools,
     )
 
+    context.db_session.commit()
+
     return MCPServerResponse(
         id=mcp_server.id,
         name=mcp_server.name,
@@ -286,6 +288,5 @@ async def remove_tool_from_mcp_server(
 async def mcp_handler(
         link: str,
         request: Request,
-        context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
 ):
-    return handle_mcp_request(link, request, context)
+    return await handle_mcp_request(link, request)

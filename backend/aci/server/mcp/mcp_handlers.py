@@ -3,10 +3,10 @@ import contextvars
 import json
 from dataclasses import dataclass
 from datetime import datetime, UTC, timedelta
-from typing import Annotated, Any, Dict, List
+from typing import Any, Dict, List
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request, HTTPException
+from fastapi import APIRouter, Request, HTTPException
 from mcp import types
 from mcp.server.lowlevel import Server
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
@@ -14,7 +14,7 @@ from mcp.types import Tool as MCPTool
 from sqlalchemy.orm import Session
 from starlette.types import Receive, Scope, Send
 
-from aci.common import processor
+from aci.common import processor, utils
 from aci.common.db import crud
 from aci.common.db.crud.apps import get_app
 from aci.common.db.crud.functions import get_functions_by_app_id
@@ -25,7 +25,6 @@ from aci.common.exceptions import FunctionNotFound, AppConfigurationNotFound, Ap
 from aci.common.logging_setup import get_logger
 from aci.common.schemas.function import FunctionExecutionResult
 from aci.server import config
-from aci.server import dependencies as deps
 from aci.server import security_credentials_manager as scm
 from aci.server.function_executors import get_executor
 from aci.server.security_credentials_manager import SecurityCredentialsResponse
@@ -33,10 +32,14 @@ from aci.server.security_credentials_manager import SecurityCredentialsResponse
 logger = get_logger(__name__)
 router = APIRouter()
 
-mcp_request_ctx_var = contextvars.ContextVar[Annotated[deps.RequestContext, Depends(deps.get_request_context)] | None](
-    "mcp_request_ctx_var", default=None)
 
-linked_account_id_ctx_var = contextvars.ContextVar[str | None]("linked_account_id", default=None)
+class MCPRequestContext:
+    def __init__(self, db_session: Session, linked_account_id: str | None = None):
+        self.db_session = db_session
+        self.linked_account_id = linked_account_id
+
+
+mcp_request_ctx_var = contextvars.ContextVar[MCPRequestContext | None]("mcp_request_ctx_var", default=None)
 
 
 class MCPAppServer:
@@ -121,7 +124,7 @@ class MCPAppServer:
                 function_input=arguments,
                 app_config_id=self.app_config_id,
                 mcp_server_id=self.mcp_server_id,
-                linked_account_owner_id=linked_account_id_ctx_var.get(),
+                linked_account_owner_id=context.linked_account_id or "default",
             )
 
             # Format the result for MCP
@@ -442,18 +445,15 @@ class MCPServerCache:
 mcp_server_cache = MCPServerCache()
 
 
-async def handle_mcp_request(
-        link: str,
-        request: Request,
-        context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
-):
-    # Set context variables
-    mcp_request_ctx_var.set(context)
-    linked_account_id_ctx_var.set(request.headers.get(config.LINKED_ACCOUNT_ID_HEADER))
-
+async def handle_mcp_request(link: str, request: Request):
+    db_session = utils.create_db_session(config.DB_FULL_URL)
     try:
+        linked_account_id = request.headers.get(config.LINKED_ACCOUNT_ID_HEADER,
+                                                request.query_params.get("linked_account_id"))
+        mcp_request_ctx_var.set(MCPRequestContext(db_session=db_session, linked_account_id=linked_account_id))
+
         # Get MCP server for this app (marks as in use)
-        mcp_server = await mcp_server_cache.get(link, context.db_session)
+        mcp_server = await mcp_server_cache.get(link, db_session)
 
         # Determine response format based on Accept header
         accept_header = request.headers.get("accept", "")
@@ -464,3 +464,4 @@ async def handle_mcp_request(
     finally:
         # Always release the cache item after use, even if an exception occurs
         await mcp_server_cache.release(link)
+        db_session.close()
