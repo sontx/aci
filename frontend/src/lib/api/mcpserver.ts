@@ -47,3 +47,8 @@ export async function removeToolFromMCPServer(
   );
   return response.data;
 }
+
+export async function regenerateMCPLink(mcpServerId: string): Promise<MCPServerResponse> {
+  const response = await axiosInstance.put(`/v1/mcp-servers/${mcpServerId}/regenerate-link`);
+  return response.data;
+}

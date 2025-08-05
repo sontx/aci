@@ -22,7 +22,6 @@ def create_mcp_server(
         app_config_id: UUID,
         auth_type: MCPAuthType,
         allowed_tools: list[str],
-        mcp_link: str | None = None,
 ) -> MCPServer:
     """Create a new MCP server."""
     logger.debug(f"Creating MCP server: {name} for app_config_id: {app_config_id}")
@@ -36,12 +35,13 @@ def create_mcp_server(
         app_config_id=app_config_id,
         auth_type=auth_type,
         allowed_tools=allowed_tools,
-        mcp_link=mcp_link or uuid4().hex,
+        mcp_link=uuid4().hex,
     )
 
     db_session.add(mcp_server)
     db_session.flush()
     db_session.refresh(mcp_server)
+
     return mcp_server
 
 
@@ -57,48 +57,40 @@ def generate_mcp_server_id(name: str, db_session: Session) -> str:
     return new_id
 
 
-def update_mcp_server(
+def regenerate_mcp_link(
         db_session: Session,
         mcp_server: MCPServer,
-        name: str | None = None,
-        auth_type: MCPAuthType | None = None,
-        allowed_tools: list[str] | None = None,
-        mcp_link: str | None = None,
-) -> MCPServer:
+) -> str:
     """Update an existing MCP server."""
     logger.debug(f"Updating MCP server: {mcp_server.id}")
 
-    if name is not None:
-        mcp_server.name = name
-    if auth_type is not None:
-        mcp_server.auth_type = auth_type
-    if allowed_tools is not None:
-        mcp_server.allowed_tools = allowed_tools
-    if mcp_link is not None:
-        mcp_server.mcp_link = mcp_link
+    # Generate a new mcp link
+    mcp_link = uuid4().hex
+    mcp_server.mcp_link = mcp_link
 
     db_session.flush()
     db_session.refresh(mcp_server)
-    return mcp_server
+
+    return mcp_link
 
 
 def get_mcp_server_by_id(db_session: Session, mcp_server_id: str) -> MCPServer | None:
     """Get an MCP server by its ID."""
     statement = select(MCPServer).filter_by(id=mcp_server_id)
-    mcp_server = db_session.execute(statement).scalar_one_or_none()
-    return build_mcp_server_link(mcp_server)
+    return db_session.execute(statement).scalar_one_or_none()
+
 
 def get_mcp_server_by_link(db_session: Session, mcp_link: str) -> MCPServer | None:
     """Get an MCP server by its link."""
     statement = select(MCPServer).filter_by(mcp_link=mcp_link)
-    mcp_server = db_session.execute(statement).scalar_one_or_none()
-    return build_mcp_server_link(mcp_server)
+    return db_session.execute(statement).scalar_one_or_none()
 
-def build_mcp_server_link(mcp_server: MCPServer | None) -> MCPServer | None:
-    if mcp_server and mcp_server.mcp_link and (
-            not mcp_server.mcp_link.startswith("http://") or not mcp_server.mcp_link.startswith("https://")):
-        mcp_server.mcp_link = f"{config.REDIRECT_URI_BASE}{config.ROUTER_PREFIX_MCP_SERVERS}/{mcp_server.mcp_link}/mcp"
-    return mcp_server
+
+def get_full_mcp_server_link(mcp_link: str | None) -> str | None:
+    if mcp_link and (
+            not mcp_link.startswith("http://") or not mcp_link.startswith("https://")):
+        mcp_link = f"{config.REDIRECT_URI_BASE}{config.ROUTER_PREFIX_MCP_SERVERS}/{mcp_link}/mcp"
+    return mcp_link
 
 
 def get_mcp_server_by_name_and_app_config(
@@ -107,7 +99,7 @@ def get_mcp_server_by_name_and_app_config(
     """Get an MCP server by name and app config ID."""
     statement = select(MCPServer).filter_by(name=name, app_config_id=app_config_id)
     mcp_server = db_session.execute(statement).scalar_one_or_none()
-    return build_mcp_server_link(mcp_server)
+    return mcp_server
 
 
 def get_mcp_servers_by_app_config(
@@ -124,10 +116,7 @@ def get_mcp_servers_by_app_config(
     if limit is not None:
         statement = statement.limit(limit)
 
-    mcp_servers = list(db_session.execute(statement).scalars().all())
-    for mcp_server in mcp_servers:
-        build_mcp_server_link(mcp_server)
-    return mcp_servers
+    return list(db_session.execute(statement).scalars().all())
 
 
 def delete_mcp_server(db_session: Session, mcp_server_id: str) -> bool:
@@ -159,20 +148,19 @@ def add_tool_to_mcp_server(
         db_session: Session,
         mcp_server: MCPServer,
         tool_function_id: str,
-) -> MCPServer:
+) -> None:
     """Add a tool to an MCP server's allowed tools list if not already present."""
     if tool_function_id not in mcp_server.allowed_tools:
         mcp_server.allowed_tools = mcp_server.allowed_tools + [tool_function_id]
         db_session.flush()
         db_session.refresh(mcp_server)
-    return mcp_server
 
 
 def remove_tool_from_mcp_server(
         db_session: Session,
         mcp_server: MCPServer,
         tool_function_id: str,
-) -> MCPServer:
+) -> None:
     """Remove a tool from an MCP server's allowed tools list."""
     if tool_function_id in mcp_server.allowed_tools:
         mcp_server.allowed_tools = [
@@ -180,7 +168,6 @@ def remove_tool_from_mcp_server(
         ]
         db_session.flush()
         db_session.refresh(mcp_server)
-    return mcp_server
 
 
 def update_mcp_server_last_used_at(

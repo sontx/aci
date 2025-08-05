@@ -9,9 +9,14 @@ import {
   deleteMCPServer,
   addToolToMCPServer,
   removeToolFromMCPServer,
+  regenerateMCPLink,
 } from "@/lib/api/mcpserver";
 import { useMetaInfo } from "@/components/context/metainfo";
-import { MCPServerCreate, MCPServerUpdate, MCPServerResponse } from "@/lib/types/mcpserver";
+import {
+  MCPServerCreate,
+  MCPServerUpdate,
+  MCPServerResponse,
+} from "@/lib/types/mcpserver";
 import { toast } from "sonner";
 
 export const mcpServerKeys = {
@@ -34,7 +39,7 @@ export const useMCPServer = (mcpServerId?: string) => {
 
   return useQuery<MCPServerResponse, Error>({
     queryKey: mcpServerKeys.detail(activeProject.id, mcpServerId || ""),
-    queryFn: () => getMCPServer(mcpServerId!, ),
+    queryFn: () => getMCPServer(mcpServerId!),
     enabled: !!mcpServerId,
   });
 };
@@ -132,7 +137,8 @@ export const useAddToolToMCPServer = () => {
   const { activeProject } = useMetaInfo();
 
   return useMutation<MCPServerResponse, Error, AddToolParams>({
-    mutationFn: (params) => addToolToMCPServer(params.mcpServerId, params.toolFunctionId),
+    mutationFn: (params) =>
+      addToolToMCPServer(params.mcpServerId, params.toolFunctionId),
     onSuccess: (updatedMCPServer, variables) => {
       queryClient.setQueryData<MCPServerResponse[]>(
         mcpServerKeys.all(activeProject.id),
@@ -166,7 +172,8 @@ export const useRemoveToolFromMCPServer = () => {
   const { activeProject } = useMetaInfo();
 
   return useMutation<MCPServerResponse, Error, RemoveToolParams>({
-    mutationFn: (params) => removeToolFromMCPServer(params.mcpServerId, params.toolFunctionId),
+    mutationFn: (params) =>
+      removeToolFromMCPServer(params.mcpServerId, params.toolFunctionId),
     onSuccess: (updatedMCPServer, variables) => {
       queryClient.setQueryData<MCPServerResponse[]>(
         mcpServerKeys.all(activeProject.id),
@@ -186,6 +193,35 @@ export const useRemoveToolFromMCPServer = () => {
     onError: (error) => {
       console.error("Remove tool from MCP server failed:", error);
       toast.error("Failed to remove tool from MCP server");
+    },
+  });
+};
+
+export const useRegenerateMCPLink = () => {
+  const queryClient = useQueryClient();
+  const { activeProject } = useMetaInfo();
+
+  return useMutation<MCPServerResponse, Error, string>({
+    mutationFn: (mcpServerId) => regenerateMCPLink(mcpServerId),
+    onSuccess: (updatedMCPServer, mcpServerId) => {
+      queryClient.setQueryData<MCPServerResponse[]>(
+        mcpServerKeys.all(activeProject.id),
+        (old = []) =>
+          old.map((server) =>
+            server.id === mcpServerId ? updatedMCPServer : server,
+          ),
+      );
+      queryClient.invalidateQueries({
+        queryKey: mcpServerKeys.all(activeProject.id),
+      });
+      queryClient.invalidateQueries({
+        queryKey: mcpServerKeys.detail(activeProject.id, mcpServerId),
+      });
+      toast.success("MCP link regenerated successfully");
+    },
+    onError: (error) => {
+      console.error("Regenerate MCP link failed:", error);
+      toast.error("Failed to regenerate MCP link");
     },
   });
 };

@@ -65,6 +65,7 @@ export function IdDisplay({
         <Tooltip>
           <TooltipTrigger asChild>
             <button
+              type="button"
               onClick={(e) => {
                 e.preventDefault();
                 copyToClipboard();

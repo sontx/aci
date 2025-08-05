@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status, Request
 from pydantic import BaseModel
 
 from aci.common.db import crud
+from aci.common.db.crud.mcp_servers import get_full_mcp_server_link
 from aci.common.enums import MCPAuthType
 from aci.common.logging_setup import get_logger
 from aci.server import dependencies as deps
@@ -20,14 +21,6 @@ class MCPServerCreate(BaseModel):
     app_config_id: UUID
     auth_type: MCPAuthType
     allowed_tools: list[str]
-    mcp_link: str | None = None
-
-
-class MCPServerUpdate(BaseModel):
-    name: str | None = None
-    auth_type: MCPAuthType | None = None
-    allowed_tools: list[str] | None = None
-    mcp_link: str | None = None
 
 
 class MCPServerResponse(BaseModel):
@@ -92,10 +85,7 @@ async def create_mcp_server(
         app_config_id=mcp_server_data.app_config_id,
         auth_type=mcp_server_data.auth_type,
         allowed_tools=mcp_server_data.allowed_tools,
-        mcp_link=mcp_server_data.mcp_link,
     )
-
-    context.db_session.commit()
 
     return MCPServerResponse(
         id=mcp_server.id,
@@ -104,7 +94,7 @@ async def create_mcp_server(
         app_name=mcp_server.app_name,
         auth_type=mcp_server.auth_type,
         allowed_tools=mcp_server.allowed_tools,
-        mcp_link=mcp_server.mcp_link,
+        mcp_link=get_full_mcp_server_link(mcp_server.mcp_link),
         created_at=mcp_server.created_at.isoformat(),
         updated_at=mcp_server.updated_at.isoformat(),
     )
@@ -150,7 +140,7 @@ async def list_mcp_servers(
             app_name=server.app_name,
             auth_type=server.auth_type,
             allowed_tools=server.allowed_tools,
-            mcp_link=server.mcp_link,
+            mcp_link=get_full_mcp_server_link(server.mcp_link),
             created_at=server.created_at.isoformat(),
             updated_at=server.updated_at.isoformat(),
         ))
@@ -181,20 +171,19 @@ async def get_mcp_server(
         app_name=mcp_server.app_name,
         auth_type=mcp_server.auth_type,
         allowed_tools=mcp_server.allowed_tools,
-        mcp_link=mcp_server.mcp_link,
+        mcp_link=get_full_mcp_server_link(mcp_server.mcp_link),
         created_at=mcp_server.created_at.isoformat(),
         updated_at=mcp_server.updated_at.isoformat(),
     )
 
 
-@router.put("/{mcp_server_id}", response_model=MCPServerResponse)
-async def update_mcp_server(
+@router.put("/{mcp_server_id}/regenerate-link", response_model=MCPServerResponse)
+async def regenerate_mcp_link(
         context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
         mcp_server_id: str,
-        update_data: MCPServerUpdate,
 ) -> MCPServerResponse:
     """
-    Update an existing MCP server.
+    Regenerate the MCP link for an existing MCP server.
     """
     mcp_server = crud.mcp_servers.get_mcp_server_by_id(context.db_session, mcp_server_id)
 
@@ -204,41 +193,21 @@ async def update_mcp_server(
             detail=f"MCP server with ID {mcp_server_id} not found"
         )
 
-    # Check for name conflicts if name is being updated
-    if update_data.name and update_data.name != mcp_server.name:
-        existing_server = crud.mcp_servers.get_mcp_server_by_name_and_app_config(
-            context.db_session,
-            update_data.name,
-            mcp_server.app_config_id
-        )
-        if existing_server:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"MCP server with name '{update_data.name}' already exists for this app configuration"
-            )
-
-    # Update the server
-    updated_server = crud.mcp_servers.update_mcp_server(
-        context.db_session,
-        mcp_server,
-        name=update_data.name,
-        auth_type=update_data.auth_type,
-        allowed_tools=update_data.allowed_tools,
-        mcp_link=update_data.mcp_link,
-    )
+    # Regenerate the MCP link
+    new_mcp_link = crud.mcp_servers.regenerate_mcp_link(context.db_session, mcp_server)
 
     context.db_session.commit()
 
     return MCPServerResponse(
-        id=updated_server.id,
-        name=updated_server.name,
-        app_config_id=updated_server.app_config_id,
-        app_name=updated_server.app_name,
-        auth_type=updated_server.auth_type,
-        allowed_tools=updated_server.allowed_tools,
-        mcp_link=updated_server.mcp_link,
-        created_at=updated_server.created_at.isoformat(),
-        updated_at=updated_server.updated_at.isoformat(),
+        id=mcp_server.id,
+        name=mcp_server.name,
+        app_config_id=mcp_server.app_config_id,
+        app_name=mcp_server.app_name,
+        auth_type=mcp_server.auth_type,
+        allowed_tools=mcp_server.allowed_tools,
+        mcp_link=get_full_mcp_server_link(new_mcp_link),
+        created_at=mcp_server.created_at.isoformat(),
+        updated_at=mcp_server.updated_at.isoformat(),
     )
 
 
@@ -266,7 +235,7 @@ async def add_tool_to_mcp_server(
         context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
         mcp_server_id: str,
         tool_function_id: str,
-) -> MCPServerResponse:
+) -> None:
     """
     Add a tool to an MCP server's allowed tools list.
     """
@@ -278,7 +247,7 @@ async def add_tool_to_mcp_server(
             detail=f"MCP server with ID {mcp_server_id} not found"
         )
 
-    updated_server = crud.mcp_servers.add_tool_to_mcp_server(
+    crud.mcp_servers.add_tool_to_mcp_server(
         context.db_session,
         mcp_server,
         tool_function_id,
@@ -286,25 +255,13 @@ async def add_tool_to_mcp_server(
 
     context.db_session.commit()
 
-    return MCPServerResponse(
-        id=updated_server.id,
-        name=updated_server.name,
-        app_config_id=updated_server.app_config_id,
-        app_name=updated_server.app_name,
-        auth_type=updated_server.auth_type,
-        allowed_tools=updated_server.allowed_tools,
-        mcp_link=updated_server.mcp_link,
-        created_at=updated_server.created_at.isoformat(),
-        updated_at=updated_server.updated_at.isoformat(),
-    )
-
 
 @router.delete("/{mcp_server_id}/tools/{tool_function_id}", response_model=MCPServerResponse)
 async def remove_tool_from_mcp_server(
         context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
         mcp_server_id: str,
         tool_function_id: str,
-) -> MCPServerResponse:
+) -> None:
     """
     Remove a tool from an MCP server's allowed tools list.
     """
@@ -316,25 +273,13 @@ async def remove_tool_from_mcp_server(
             detail=f"MCP server with ID {mcp_server_id} not found"
         )
 
-    updated_server = crud.mcp_servers.remove_tool_from_mcp_server(
+    crud.mcp_servers.remove_tool_from_mcp_server(
         context.db_session,
         mcp_server,
         tool_function_id,
     )
 
     context.db_session.commit()
-
-    return MCPServerResponse(
-        id=updated_server.id,
-        name=updated_server.name,
-        app_config_id=updated_server.app_config_id,
-        app_name=updated_server.app_name,
-        auth_type=updated_server.auth_type,
-        allowed_tools=updated_server.allowed_tools,
-        mcp_link=updated_server.mcp_link,
-        created_at=updated_server.created_at.isoformat(),
-        updated_at=updated_server.updated_at.isoformat(),
-    )
 
 
 @router.api_route("/{link}/mcp", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])

@@ -5,19 +5,30 @@ import { Badge } from "@/components/ui/badge";
 import { IdDisplay } from "@/components/apps/id-display";
 import { useApp } from "@/hooks/use-app";
 import Image from "next/image";
+import { RefreshCcw } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "../ui/tooltip";
+import { useRegenerateMCPLink } from "@/hooks/use-mcp-server";
+import { cn } from "@/lib/utils";
 
 interface MCPServerOverviewProps {
   mcpServer: MCPServerResponse;
 }
 
 export function MCPServerOverview({ mcpServer }: MCPServerOverviewProps) {
-  const { app } = useApp(mcpServer.app_name);
+  const { data: app } = useApp(mcpServer.app_name);
+  const { mutate: regenerateMCPLink, isPending: isGenerating } =
+    useRegenerateMCPLink();
 
   return (
     <div className="grid grid-cols-1 gap-4">
       <div>
         {app && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <div className="relative h-8 w-8 flex-shrink-0 overflow-hidden rounded-lg">
               <Image
                 src={app.logo}
@@ -28,9 +39,7 @@ export function MCPServerOverview({ mcpServer }: MCPServerOverviewProps) {
             </div>
             <div>
               <p className="text-sm font-medium">{app.display_name}</p>
-              <p className="text-xs text-muted-foreground">
-                {app.description}
-              </p>
+              <p className="text-xs text-muted-foreground">{app.description}</p>
             </div>
           </div>
         )}
@@ -50,8 +59,32 @@ export function MCPServerOverview({ mcpServer }: MCPServerOverviewProps) {
 
       {mcpServer.mcp_link && (
         <div>
-          <label className="text-sm font-medium text-muted-foreground">
-            MCP Link
+          <label className="flex gap-2 items-center text-sm font-medium text-muted-foreground">
+            <span>MCP Link</span>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      regenerateMCPLink(mcpServer.id);
+                    }}
+                    className="text-gray-500 hover:text-gray-700"
+                    disabled={isGenerating}
+                  >
+                    <RefreshCcw
+                      className={cn("h-4 w-4", {
+                        "animate-spin": isGenerating,
+                      })}
+                    />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Regenerate MCP Link</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </label>
           <div className="mt-1">
             <IdDisplay id={mcpServer.mcp_link} dim={false} />
