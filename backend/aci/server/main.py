@@ -1,3 +1,4 @@
+import logging
 from typing import Any
 
 import logfire
@@ -49,6 +50,7 @@ setup_logging(
     # ),
     filters=[RequestContextFilter(), LogSchemaFilter()],
     environment=config.ENVIRONMENT,
+    level=getattr(logging, config.LOGGING_LEVEL)
 )
 
 stripe.api_key = config.STRIPE_SECRET_KEY

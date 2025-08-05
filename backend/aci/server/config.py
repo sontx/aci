@@ -1,6 +1,9 @@
+import os
+
 from aci.common.utils import check_and_get_env_variable, construct_db_url
 
 ENVIRONMENT = check_and_get_env_variable("SERVER_ENVIRONMENT")
+LOGGING_LEVEL = os.getenv("LOGGING_LEVEL", "INFO").upper()
 
 # JWT
 SIGNING_KEY = check_and_get_env_variable("SERVER_SIGNING_KEY")
