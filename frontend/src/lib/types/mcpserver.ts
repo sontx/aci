@@ -25,4 +25,5 @@ export interface MCPServerResponse {
   mcp_link: string | null;
   created_at: string;
   updated_at: string;
+  last_used_at: string;
 }

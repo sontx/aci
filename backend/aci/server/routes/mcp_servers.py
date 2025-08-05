@@ -1,13 +1,12 @@
 from typing import Annotated
-from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status, Request
-from pydantic import BaseModel
 
 from aci.common.db import crud
 from aci.common.db.crud.mcp_servers import get_full_mcp_server_link
-from aci.common.enums import MCPAuthType
+from aci.common.db.sql_models import MCPServer
 from aci.common.logging_setup import get_logger
+from aci.common.schemas.mcp_servers import MCPServerResponse, MCPServerCreate, MCPServerListQuery
 from aci.server import dependencies as deps
 from aci.server.mcp.mcp_handlers import handle_mcp_request
 
@@ -15,34 +14,7 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 
-# Pydantic models for request/response
-class MCPServerCreate(BaseModel):
-    name: str
-    app_config_id: UUID
-    auth_type: MCPAuthType
-    allowed_tools: list[str]
-
-
-class MCPServerResponse(BaseModel):
-    id: str
-    name: str
-    app_config_id: UUID
-    app_name: str
-    auth_type: MCPAuthType
-    allowed_tools: list[str]
-    mcp_link: str | None
-    created_at: str
-    updated_at: str
-
-
-class MCPServerListQuery(BaseModel):
-    app_config_id: UUID | None = None
-    auth_type: MCPAuthType | None = None
-    limit: int | None = None
-    offset: int | None = None
-
-
-@router.post("", response_model=MCPServerResponse, status_code=status.HTTP_201_CREATED)
+@router.post("")
 async def create_mcp_server(
         context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
         mcp_server_data: MCPServerCreate,
@@ -89,6 +61,10 @@ async def create_mcp_server(
 
     context.db_session.commit()
 
+    return to_mcp_server_response(mcp_server)
+
+
+def to_mcp_server_response(mcp_server: MCPServer) -> MCPServerResponse:
     return MCPServerResponse(
         id=mcp_server.id,
         name=mcp_server.name,
@@ -97,12 +73,13 @@ async def create_mcp_server(
         auth_type=mcp_server.auth_type,
         allowed_tools=mcp_server.allowed_tools,
         mcp_link=get_full_mcp_server_link(mcp_server.mcp_link),
-        created_at=mcp_server.created_at.isoformat(),
-        updated_at=mcp_server.updated_at.isoformat(),
+        created_at=mcp_server.created_at,
+        updated_at=mcp_server.updated_at,
+        last_used_at=mcp_server.last_used_at
     )
 
 
-@router.get("", response_model=list[MCPServerResponse])
+@router.get("")
 async def list_mcp_servers(
         context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
         query_params: Annotated[MCPServerListQuery, Query()],
@@ -135,22 +112,12 @@ async def list_mcp_servers(
 
     response = []
     for server in mcp_servers:
-        response.append(MCPServerResponse(
-            id=server.id,
-            name=server.name,
-            app_config_id=server.app_config_id,
-            app_name=server.app_name,
-            auth_type=server.auth_type,
-            allowed_tools=server.allowed_tools,
-            mcp_link=get_full_mcp_server_link(server.mcp_link),
-            created_at=server.created_at.isoformat(),
-            updated_at=server.updated_at.isoformat(),
-        ))
+        response.append(to_mcp_server_response(server))
 
     return response
 
 
-@router.get("/{mcp_server_id}", response_model=MCPServerResponse)
+@router.get("/{mcp_server_id}")
 async def get_mcp_server(
         context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
         mcp_server_id: str,
@@ -166,20 +133,10 @@ async def get_mcp_server(
             detail=f"MCP server with ID {mcp_server_id} not found"
         )
 
-    return MCPServerResponse(
-        id=mcp_server.id,
-        name=mcp_server.name,
-        app_config_id=mcp_server.app_config_id,
-        app_name=mcp_server.app_name,
-        auth_type=mcp_server.auth_type,
-        allowed_tools=mcp_server.allowed_tools,
-        mcp_link=get_full_mcp_server_link(mcp_server.mcp_link),
-        created_at=mcp_server.created_at.isoformat(),
-        updated_at=mcp_server.updated_at.isoformat(),
-    )
+    return to_mcp_server_response(mcp_server)
 
 
-@router.put("/{mcp_server_id}/regenerate-link", response_model=MCPServerResponse)
+@router.put("/{mcp_server_id}/regenerate-link")
 async def regenerate_mcp_link(
         context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
         mcp_server_id: str,
@@ -200,20 +157,10 @@ async def regenerate_mcp_link(
 
     context.db_session.commit()
 
-    return MCPServerResponse(
-        id=mcp_server.id,
-        name=mcp_server.name,
-        app_config_id=mcp_server.app_config_id,
-        app_name=mcp_server.app_name,
-        auth_type=mcp_server.auth_type,
-        allowed_tools=mcp_server.allowed_tools,
-        mcp_link=get_full_mcp_server_link(new_mcp_link),
-        created_at=mcp_server.created_at.isoformat(),
-        updated_at=mcp_server.updated_at.isoformat(),
-    )
+    return to_mcp_server_response(mcp_server)
 
 
-@router.delete("/{mcp_server_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{mcp_server_id}")
 async def delete_mcp_server(
         context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
         mcp_server_id: str,
@@ -232,7 +179,7 @@ async def delete_mcp_server(
     context.db_session.commit()
 
 
-@router.post("/{mcp_server_id}/tools/{tool_function_id}", response_model=MCPServerResponse)
+@router.post("/{mcp_server_id}/tools/{tool_function_id}")
 async def add_tool_to_mcp_server(
         context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
         mcp_server_id: str,
@@ -258,7 +205,7 @@ async def add_tool_to_mcp_server(
     context.db_session.commit()
 
 
-@router.delete("/{mcp_server_id}/tools/{tool_function_id}", response_model=MCPServerResponse)
+@router.delete("/{mcp_server_id}/tools/{tool_function_id}")
 async def remove_tool_from_mcp_server(
         context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
         mcp_server_id: str,

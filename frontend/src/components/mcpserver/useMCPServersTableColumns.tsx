@@ -19,7 +19,7 @@ import { toast } from "sonner";
 import { useDeleteMCPServer } from "@/hooks/use-mcp-server";
 import { AppItemDisplay } from "@/components/apps/app-item-display";
 import { RouterLink } from "@/components/ui-extensions/router-link";
-import { formatToLocalTime } from "@/utils/time";
+import { formatRelativeTime, formatToLocalTime } from "@/utils/time";
 
 const columnHelper = createColumnHelper<MCPServerResponse>();
 
@@ -70,6 +70,29 @@ export const useMCPServersTableColumns = (): ColumnDef<MCPServerResponse>[] => {
             {formatToLocalTime(info.getValue())}
           </div>
         ),
+        enableGlobalFilter: false,
+      }) as ColumnDef<MCPServerResponse>,
+
+      columnHelper.accessor("updated_at", {
+        header: "Updated At",
+        cell: (info) => (
+          <div className="text-nowrap">
+            {formatToLocalTime(info.getValue())}
+          </div>
+        ),
+        enableGlobalFilter: false,
+      }) as ColumnDef<MCPServerResponse>,
+
+      columnHelper.accessor("last_used_at", {
+        header: "Last Used At",
+        cell: (info) => {
+          const lastUsedAt = info.getValue();
+          return (
+            <div className="text-nowrap">
+              {lastUsedAt ? formatRelativeTime(lastUsedAt) : "Never"}
+            </div>
+          );
+        },
         enableGlobalFilter: false,
       }) as ColumnDef<MCPServerResponse>,
 

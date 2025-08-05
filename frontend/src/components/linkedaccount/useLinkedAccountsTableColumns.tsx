@@ -21,7 +21,7 @@ import { AppItemDisplay } from "@/components/apps/app-item-display";
 import { IdDisplay } from "@/components/apps/id-display";
 import { LinkedAccountDetails } from "@/components/linkedaccount/linked-account-details";
 import { EnhancedSwitch } from "@/components/ui-extensions/enhanced-switch/enhanced-switch";
-import { formatToLocalTime } from "@/utils/time";
+import { formatToLocalTime, formatRelativeTime } from "@/utils/time";
 import { useMetaInfo } from "@/components/context/metainfo";
 
 const columnHelper = createColumnHelper<LinkedAccount>();
@@ -118,7 +118,7 @@ export const useLinkedAccountsTableColumns = (
           header: () => <span className="text-nowrap">Last Used At</span>,
           cell: (info) => {
             const lastUsedAt = info.getValue();
-            return lastUsedAt ? formatToLocalTime(lastUsedAt) : "Never";
+            return lastUsedAt ? formatRelativeTime(lastUsedAt) : "Never";
           },
           enableGlobalFilter: false,
         }) as ColumnDef<LinkedAccount>,
