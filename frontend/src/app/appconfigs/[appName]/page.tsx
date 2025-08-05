@@ -28,7 +28,7 @@ import { useLinkedAccountsTableColumns } from "@/components/linkedaccount/useLin
 export default function AppConfigDetailPage() {
   const { appName } = useParams<{ appName: string }>();
 
-  const { app } = useApp(appName);
+  const { data: app } = useApp(appName);
   const { data: appConfig } = useAppConfig(appName);
 
   const { data: linkedAccounts = [] } = useAppLinkedAccounts(appName);

@@ -6,14 +6,11 @@ interface MCPServerStepProps {
 }
 
 export function MCPServerStep({ onNext, appConfigId }: MCPServerStepProps) {
-  const handleSuccess = () => {
-    onNext();
-  };
-
   return (
     <MCPServerFormContent
       defaultAppConfigId={appConfigId}
-      onSuccess={handleSuccess}
+      onSuccess={onNext}
+      onCancel={onNext}
       cancelButtonText="Skip"
     />
   );
