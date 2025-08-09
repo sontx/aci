@@ -33,14 +33,11 @@ def format_to_screaming_snake_case(name: str) -> str:
     e.g., "GitHub/Create Repository" -> "GITHUB_CREATE_REPOSITORY"
     e.g., "github-create-repository" -> "GITHUB_CREATE_REPOSITORY"
     """
-    name = re.sub(r"[\W]+", "_", name)  # Replace non-alphanumeric characters with underscore
-    s1 = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", name)
-    s2 = re.sub("([a-z0-9])([A-Z])", r"\1_\2", s1)
-    s3 = s2.replace("-", "_").replace("/", "_").replace(" ", "_")
-    s3 = re.sub("_+", "_", s3)  # Replace multiple underscores with single underscore
-    s4 = s3.upper().strip("_")
-
-    return s4
+    # Replace any run of non-alphanumeric characters with a single underscore
+    s = re.sub(r"[^0-9A-Za-z]+", "_", name)
+    # Collapse multiple underscores and trim
+    s = re.sub(r"_+", "_", s).strip("_")
+    return s.upper()
 
 
 # NOTE: it's important that you don't create a new engine for each session, which takes
