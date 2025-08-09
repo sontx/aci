@@ -2,7 +2,7 @@
 import * as React from "react";
 import { type AppFunction, RestMetadata } from "@/lib/types/appfunction";
 import { Badge } from "@/components/ui/badge";
-import { Hammer, Plug } from "lucide-react";
+import { Hammer } from "lucide-react";
 import { MarkdownViewer } from "@/components/ui-extensions/markdown-viewer";
 import {
   Card,
