@@ -80,6 +80,16 @@ def parse_app_name_from_function_name(function_name: str) -> str:
     return function_name.split("__")[0]
 
 
+def build_function_name(app_name: str, function_name: str) -> str:
+    """
+    Build a function name from an app name and a function name.
+    e.g., "ACI_TEST", "HELLO_WORLD" -> "ACI_TEST__HELLO_WORLD"
+    """
+    if function_name.startswith(f"{app_name}__"):
+        return function_name
+    return f"{app_name}__{function_name}"
+
+
 def snake_to_camel(string: str) -> str:
     """
     Convert a snake case string to a camel case string.

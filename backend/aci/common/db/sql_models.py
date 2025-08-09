@@ -28,7 +28,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
-    text,
+    text, Index,
 )
 from sqlalchemy import Enum as SqlEnum
 
@@ -37,6 +37,7 @@ from sqlalchemy.dialects.postgresql import ARRAY, BYTEA, JSONB
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.ext.mutable import MutableDict
 from sqlalchemy.orm import DeclarativeBase, Mapped, MappedAsDataclass, mapped_column, relationship
+from sqlalchemy.sql import expression
 
 from aci.common.db.custom_sql_types import (
     EncryptedSecurityCredentials,
@@ -173,7 +174,7 @@ class Function(Base):
     )
     # Note: the function name is unique across the platform and should have app information, e.g., "GITHUB_CLONE_REPO"
     # ideally this should just be <app name>_<function name> (uppercase)
-    name: Mapped[str] = mapped_column(String(MAX_STRING_LENGTH), nullable=False, unique=True)
+    name: Mapped[str] = mapped_column(String(MAX_STRING_LENGTH), nullable=False, index=True)
     description: Mapped[str] = mapped_column(Text, nullable=False)
     tags: Mapped[list[str]] = mapped_column(ARRAY(String), nullable=False)
     # if private, the function is only visible to privileged Projects (e.g., useful for internal and A/B testing)
@@ -197,6 +198,7 @@ class Function(Base):
         nullable=False,
         init=False,
     )
+    org_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), nullable=True, index=True, default=None)
 
     # the App that this function belongs to
     app: Mapped[App] = relationship("App", lazy="select", back_populates="functions", init=False)
@@ -205,6 +207,17 @@ class Function(Base):
     def app_name(self) -> str:
         return str(self.app.name)
 
+    # unique constraint: name is unique within an app
+    __table_args__ = (
+        Index(
+            "uq_function_orgid_name",
+            func.coalesce(func.cast(org_id, String), text("'null_org'")),
+            name,
+            unique=True,
+            postgresql_using="btree"
+        ),
+    )
+
 
 class App(Base):
     __tablename__ = "apps"
@@ -212,8 +225,8 @@ class App(Base):
     id: Mapped[UUID] = mapped_column(
         PGUUID(as_uuid=True), primary_key=True, default_factory=uuid4, init=False
     )
-    # Need name to be unique to support globally unique function name.
-    name: Mapped[str] = mapped_column(String(APP_NAME_MAX_LENGTH), nullable=False, unique=True)
+    # Need name within org to be unique to support globally unique function name.
+    name: Mapped[str] = mapped_column(String(APP_NAME_MAX_LENGTH), nullable=False, index=True)
     display_name: Mapped[str] = mapped_column(String(MAX_STRING_LENGTH), nullable=False)
     # provider (or company) of the app, e.g., google, github, or ACI or user (if allow user to create custom apps)
     provider: Mapped[str] = mapped_column(String(MAX_STRING_LENGTH), nullable=False)
@@ -246,6 +259,7 @@ class App(Base):
         nullable=False,
         init=False,
     )
+    org_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), nullable=True, index=True, default=None)
 
     # deleting app will delete all functions under the app
     functions: Mapped[list[Function]] = relationship(
@@ -254,6 +268,17 @@ class App(Base):
         cascade="all, delete-orphan",
         back_populates="app",
         init=False,
+    )
+
+    # unique constraint: name is unique within an org
+    __table_args__ = (
+        Index(
+            "uq_app_orgid_name",
+            func.coalesce(func.cast(org_id, String), text("'null_org'")),
+            name,
+            unique=True,
+            postgresql_using="btree",
+        ),
     )
 
 

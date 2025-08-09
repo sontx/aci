@@ -107,7 +107,7 @@ export function DeleteProjectDialog({ projectName }: DeleteProjectDialogProps) {
           <AlertDialogCancel onClick={resetForm}>Cancel</AlertDialogCancel>
           <AlertDialogAction
             onClick={handleDeleteProject}
-            className="bg-red-600 hover:bg-red-700"
+            destructive
             disabled={isProjectDeleting || confirmName !== projectName}
           >
             {isProjectDeleting ? "Deleting..." : "Delete Project"}

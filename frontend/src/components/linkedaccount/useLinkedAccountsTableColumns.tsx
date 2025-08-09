@@ -194,6 +194,7 @@ export const useLinkedAccountsTableColumns = (
                             toast.error("Failed to delete linked account");
                           }
                         }}
+                        destructive
                       >
                         Delete
                       </AlertDialogAction>

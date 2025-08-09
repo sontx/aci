@@ -206,6 +206,7 @@ export const useAppConfigsTableColumns = ({
                           toast.error("Failed to delete app configuration");
                         }
                       }}
+                      destructive
                     >
                       Delete
                     </AlertDialogAction>

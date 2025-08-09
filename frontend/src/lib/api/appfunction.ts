@@ -14,7 +14,7 @@ export async function executeFunction(
   try {
     const response = await axiosInstance.post(
       `/v1/functions/${functionName}/execute`,
-      body
+      body,
     );
 
     return response.data;
@@ -22,12 +22,17 @@ export async function executeFunction(
     return {
       success: false,
       data: {},
-      error: error instanceof AxiosError ? error.response?.data?.error || error.message : String(error),
+      error:
+        error instanceof AxiosError
+          ? error.response?.data?.error || error.message
+          : String(error),
     };
   }
 }
 
-export async function searchFunctions(params: FunctionsSearchParams): Promise<AppFunction[]> {
+export async function searchFunctions(
+  params: FunctionsSearchParams,
+): Promise<AppFunction[]> {
   const searchParams = new URLSearchParams();
 
   if (params.app_names?.length) {
@@ -50,16 +55,18 @@ export async function searchFunctions(params: FunctionsSearchParams): Promise<Ap
   }
 
   const response = await axiosInstance.get(
-    `/v1/functions/search?${searchParams.toString()}`
+    `/v1/functions/search?${searchParams.toString()}`,
   );
 
   return response.data;
 }
 
 export async function getAppFunction(name: string): Promise<AppFunction> {
-  const response = await axiosInstance.get(
-    `/v1/functions/${name}/definition?format=raw`
-  );
+  const response = await axiosInstance.get(`/v1/functions/${name}/definition`, {
+    params: {
+      format: "raw",
+    },
+  });
 
   return response.data;
 }

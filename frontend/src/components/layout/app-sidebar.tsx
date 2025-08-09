@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { GrAppsRounded } from "react-icons/gr";
+import { GrApps, GrAppsRounded } from "react-icons/gr";
 // import { GoHome } from "react-icons/go";
 import { cn } from "@/lib/utils";
 import { usePathname } from "next/navigation";
@@ -28,7 +28,6 @@ import {
   RiLinkUnlinkM,
   RiSettings3Line,
 } from "react-icons/ri";
-import { AiOutlineRobot } from "react-icons/ai";
 import { HiOutlineServer } from "react-icons/hi2";
 
 import {
@@ -48,6 +47,11 @@ export const sidebarItems = [
     title: "App Store",
     url: `/apps`,
     icon: PiStorefront,
+  },
+  {
+    title: "My Apps",
+    url: `/my-apps`,
+    icon: GrApps,
   },
   {
     title: "App Configurations",

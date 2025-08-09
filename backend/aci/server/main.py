@@ -25,6 +25,8 @@ from aci.server.routes import (
     analytics,
     app_configurations,
     apps,
+    user_apps,
+    user_functions,
     billing,
     functions,
     health,
@@ -144,6 +146,18 @@ app.include_router(
     apps.router,
     prefix=config.ROUTER_PREFIX_APPS,
     tags=[config.ROUTER_PREFIX_APPS.split("/")[-1]],
+    dependencies=[Depends(deps.validate_project_quota)],
+)
+app.include_router(
+    user_apps.router,
+    prefix=config.ROUTER_PREFIX_USER_APPS,
+    tags=[config.ROUTER_PREFIX_USER_APPS.split("/")[-1]],
+    dependencies=[Depends(deps.validate_project_quota)],
+)
+app.include_router(
+    user_functions.router,
+    prefix=config.ROUTER_PREFIX_USER_FUNCTIONS,
+    tags=[config.ROUTER_PREFIX_USER_FUNCTIONS.split("/")[-1]],
     dependencies=[Depends(deps.validate_project_quota)],
 )
 app.include_router(

@@ -152,7 +152,7 @@ export function useOrgMembersTableColumns({
                             isCurrentUser: false,
                           });
                         }}
-                        className="bg-red-600 hover:bg-red-700"
+                        destructive
                       >
                         {dialogState.isCurrentUser ? "Leave" : "Remove"}
                       </AlertDialogAction>

@@ -34,29 +34,27 @@ const AppPage = () => {
   return (
     <div>
       <div className="m-4 flex items-center justify-between">
-        <div>
-          {app && (
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center gap-4">
-                <div className="relative h-12 w-12 flex-shrink-0 overflow-hidden rounded-lg">
-                  <Image
-                    src={app?.logo ?? ""}
-                    alt={`${app?.display_name} logo`}
-                    fill
-                    className="object-contain"
-                  />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold">{app.display_name}</h1>
-                  <IdDisplay id={app.name} />
-                </div>
+        {app && (
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-4">
+              <div className="relative h-12 w-12 flex-shrink-0 overflow-hidden rounded-lg">
+                <Image
+                  src={app?.logo ?? ""}
+                  alt={`${app?.display_name} logo`}
+                  fill
+                  className="object-contain"
+                />
               </div>
-              <div className="max-w-3xl text-sm text-muted-foreground">
-                {app.description}
+              <div>
+                <h1 className="text-2xl font-bold">{app.display_name}</h1>
+                <IdDisplay id={app.name} />
               </div>
             </div>
-          )}
-        </div>
+            <div className="max-w-3xl text-sm text-muted-foreground">
+              {app.description}
+            </div>
+          </div>
+        )}
         <div className="flex items-center gap-2">
           {app && (
             <ConfigureApp
@@ -64,10 +62,7 @@ const AppPage = () => {
               supported_security_schemes={app.supported_security_schemes ?? {}}
               logo={app.logo}
             >
-              <Button
-                className="bg-primary text-white hover:bg-primary/90"
-                disabled={isAppConfigLoading || !!appConfig}
-              >
+              <Button disabled={isAppConfigLoading || !!appConfig}>
                 {isAppConfigLoading ? (
                   <div className="flex items-center gap-2">
                     <Loader2 className="h-4 w-4 animate-spin" />

@@ -1,11 +1,9 @@
 import time
 from datetime import datetime
 from typing import Annotated
-from uuid import UUID
 
 import stripe
 from fastapi import APIRouter, Body, Depends, Header, Request, status
-from propelauth_fastapi import User
 from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -30,7 +28,7 @@ from aci.common.schemas.subscription import (
 )
 from aci.server import acl, billing, config
 from aci.server import dependencies as deps
-from aci.server.config import ACI_ORG_ID_HEADER
+from aci.server.dependencies import OrgContext, get_org_context
 
 router = APIRouter()
 logger = get_logger(__name__)
@@ -40,24 +38,22 @@ auth = acl.get_propelauth()
 
 @router.get("/get-subscription", response_model=SubscriptionPublic)
 async def get_subscription(
-    db_session: Annotated[Session, Depends(deps.yield_db_session)],
-    org_id: Annotated[UUID, Header(alias=config.ACI_ORG_ID_HEADER)],
-    user: Annotated[User, Depends(auth.require_user)],
+        context: Annotated[OrgContext, Depends(get_org_context)],
 ) -> SubscriptionPublic:
-    acl.require_org_member(user, org_id)
+    acl.require_org_member(context.user, context.org_id)
 
-    active_subscription = crud.subscriptions.get_subscription_by_org_id(db_session, org_id)
+    active_subscription = crud.subscriptions.get_subscription_by_org_id(context.db_session, context.org_id)
     if not active_subscription:
         logger.info(
             "no active subscription found, the org is on the free plan",
-            extra={"org_id": org_id},
+            extra={"org_id": context.org_id},
         )
         return SubscriptionPublic(
             plan="free",
             status=StripeSubscriptionStatus.ACTIVE,
         )
 
-    plan = crud.plans.get_by_id(db_session, active_subscription.plan_id)
+    plan = crud.plans.get_by_id(context.db_session, active_subscription.plan_id)
     if not plan:
         logger.error(
             "plan not found",
@@ -72,24 +68,22 @@ async def get_subscription(
 
 @router.get("/quota-usage", response_model=QuotaUsageResponse)
 async def get_quota_usage(
-    db_session: Annotated[Session, Depends(deps.yield_db_session)],
-    org_id: Annotated[UUID, Header(alias=ACI_ORG_ID_HEADER)],
-    user: Annotated[User, Depends(auth.require_user)],
+        context: Annotated[OrgContext, Depends(get_org_context)],
 ) -> QuotaUsageResponse:
-    acl.require_org_member(user, org_id)
+    acl.require_org_member(context.user, context.org_id)
 
-    active_plan = billing.get_active_plan_by_org_id(db_session, org_id)
-    logger.info(f"Getting quota usage, org_id={org_id}, plan={active_plan.name}")
+    active_plan = billing.get_active_plan_by_org_id(context.db_session, context.org_id)
+    logger.info(f"Getting quota usage, org_id={context.org_id}, plan={active_plan.name}")
 
-    projects_used = len(crud.projects.get_projects_by_org(db_session, org_id))
+    projects_used = len(crud.projects.get_projects_by_org(context.db_session, context.org_id))
     agent_credentials_used = crud.secret.get_total_number_of_agent_secrets_for_org(
-        db_session, org_id
+        context.db_session, context.org_id
     )
     linked_accounts_used = crud.linked_accounts.get_total_number_of_unique_linked_account_owner_ids(
-        db_session, org_id
+        context.db_session, context.org_id
     )
     total_monthly_api_calls_used_of_org = crud.projects.get_total_monthly_quota_usage_for_org(
-        db_session, org_id
+        context.db_session, context.org_id
     )
 
     return QuotaUsageResponse(
@@ -103,14 +97,12 @@ async def get_quota_usage(
 
 @router.post("/create-checkout-session")
 async def create_checkout_session(
-    user: Annotated[User, Depends(auth.require_user)],
-    db_session: Annotated[Session, Depends(deps.yield_db_session)],
-    org_id: Annotated[UUID, Header(alias=config.ACI_ORG_ID_HEADER)],
-    body: Annotated[StripeCheckoutSessionCreate, Body()],
+        context: Annotated[OrgContext, Depends(get_org_context)],
+        body: Annotated[StripeCheckoutSessionCreate, Body()],
 ) -> str:
-    acl.require_org_member_with_minimum_role(user, org_id, OrganizationRole.ADMIN)
+    acl.require_org_member_with_minimum_role(context.user, context.org_id, OrganizationRole.ADMIN)
 
-    plan = crud.plans.get_by_name(db_session, body.plan_name)
+    plan = crud.plans.get_by_name(context.db_session, body.plan_name)
     if not plan:
         logger.error(f"Plan not found, plan_name={body.plan_name}")
         raise SubscriptionPlanNotFound(f"Plan={body.plan_name} not found")
@@ -132,14 +124,14 @@ async def create_checkout_session(
             success_url=f"{config.DEV_PORTAL_URL}/settings",
             cancel_url=f"{config.DEV_PORTAL_URL}/pricing",
             mode="subscription",
-            client_reference_id=str(org_id),
+            client_reference_id=str(context.org_id),
             ui_mode="hosted",
             billing_address_collection="required",
-            customer_email=user.email,
+            customer_email=context.user.email,
             metadata=StripeSubscriptionMetadata(
-                org_id=org_id,
-                checkout_user_id=user.user_id,
-                checkout_user_email=user.email,
+                org_id=context.org_id,
+                checkout_user_id=context.user.user_id,
+                checkout_user_email=context.user.email,
             ).model_dump(),
         )
     except stripe.StripeError as e:
@@ -155,15 +147,13 @@ async def create_checkout_session(
 
 @router.post("/create-customer-portal-session")
 async def create_customer_portal_session(
-    user: Annotated[User, Depends(auth.require_user)],
-    db_session: Annotated[Session, Depends(deps.yield_db_session)],
-    org_id: Annotated[UUID, Header(alias=config.ACI_ORG_ID_HEADER)],
+        context: Annotated[OrgContext, Depends(get_org_context)],
 ) -> str:
-    acl.require_org_member_with_minimum_role(user, org_id, OrganizationRole.ADMIN)
+    acl.require_org_member_with_minimum_role(context.user, context.org_id, OrganizationRole.ADMIN)
 
-    active_subscription = crud.subscriptions.get_subscription_by_org_id(db_session, org_id)
+    active_subscription = crud.subscriptions.get_subscription_by_org_id(context.db_session, context.org_id)
     if not active_subscription:
-        logger.error(f"Subscription not found, the org is on the free plan, org_id={org_id}")
+        logger.error(f"Subscription not found, the org is on the free plan, org_id={context.org_id}")
         raise BillingError(
             "Subscription not found, the org is on the free plan",
             error_code=status.HTTP_404_NOT_FOUND,
@@ -183,9 +173,9 @@ async def create_customer_portal_session(
 
 @router.post("/webhook")
 async def handle_stripe_webhook(
-    request: Request,
-    db_session: Annotated[Session, Depends(deps.yield_db_session)],
-    stripe_signature: str = Header(None),
+        request: Request,
+        db_session: Annotated[Session, Depends(deps.yield_db_session)],
+        stripe_signature: str = Header(None),
 ) -> None:
     payload = await request.body()
     event = None
@@ -388,7 +378,7 @@ async def handle_checkout_session_completed(session_data: dict, db_session: Sess
 
 
 async def handle_customer_subscription_updated(
-    subscription_data: dict, db_session: Session
+        subscription_data: dict, db_session: Session
 ) -> None:
     """
     Handles the customer.subscription.updated event.
@@ -521,7 +511,7 @@ async def handle_customer_subscription_updated(
 
 
 async def handle_customer_subscription_deleted(
-    subscription_data: dict, db_session: Session
+        subscription_data: dict, db_session: Session
 ) -> None:
     """
     Handles the customer.subscription.deleted event.
@@ -593,7 +583,7 @@ async def handle_customer_subscription_deleted(
 
 
 def _parse_stripe_subscription_details(
-    subscription_data: dict,
+        subscription_data: dict,
 ) -> StripeSubscriptionDetails:
     """
     Parse the Stripe subscription details from a Stripe subscription dict based on the

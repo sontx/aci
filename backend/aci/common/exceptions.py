@@ -459,3 +459,16 @@ class MaxAgentSecretsReached(ACIException):
             message=message,
             error_code=status.HTTP_403_FORBIDDEN,
         )
+
+
+class ConflictError(ACIException):
+    """
+    Exception raised when a resource conflict occurs (e.g., duplicate names)
+    """
+
+    def __init__(self, message: str):
+        super().__init__(
+            title="Conflict error",
+            message=message,
+            error_code=status.HTTP_409_CONFLICT,
+        )

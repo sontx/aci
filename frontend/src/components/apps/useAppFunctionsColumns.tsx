@@ -35,7 +35,11 @@ export const useAppFunctionsColumns = (): ColumnDef<AppFunction>[] => {
 
       columnHelper.accessor("description", {
         header: "Description",
-        cell: (info) => <div className="max-w-[500px]">{info.getValue()}</div>,
+        cell: (info) => (
+          <div className="max-w-[500px] line-clamp-2" title={info.getValue()}>
+            {info.getValue()}
+          </div>
+        ),
         enableGlobalFilter: true,
       }),
 
@@ -44,7 +48,7 @@ export const useAppFunctionsColumns = (): ColumnDef<AppFunction>[] => {
         cell: (info) => (
           <div className="flex flex-wrap gap-2 overflow-hidden">
             {(info.getValue() || []).map((tag: string) => (
-              <Badge key={tag} variant="normal">
+              <Badge key={tag} variant="normal" className="text-nowrap">
                 {tag}
               </Badge>
             ))}

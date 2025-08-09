@@ -69,14 +69,6 @@ export const MetaInfoProvider = withRequiredAuthInfo<MetaInfoProviderProps>(
     }, [accessToken]);
 
     useEffect(() => {
-      if (activeOrg) {
-        localStorage.setItem(ACTIVE_ORG_ID_KEY, activeOrg.orgId);
-      } else {
-        localStorage.removeItem(ACTIVE_ORG_ID_KEY);
-      }
-    }, [activeOrg]);
-
-    useEffect(() => {
       if (orgs.length > 0) {
         // Get active org from local storage
         const savedOrgId = localStorage.getItem(ACTIVE_ORG_ID_KEY);

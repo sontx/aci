@@ -14,15 +14,19 @@ def validate_function_parameters_schema_common(parameters_schema: dict, path: st
 
     # Ensure properties field exists
     if "properties" not in parameters_schema:
-        raise ValueError(f"Missing 'properties' field at {path}")
+        # If additionalProperties is true, we can skip properties validation
+        if not parameters_schema.get("additionalProperties"):
+            raise ValueError(f"Missing 'properties' field at {path}")
 
     # Ensure required field exists
     if "required" not in parameters_schema:
-        raise ValueError(f"Missing 'required' field at {path}")
+        if not parameters_schema.get("additionalProperties"):
+            raise ValueError(f"Missing 'required' field at {path}")
 
     # Ensure visible field exists
     if "visible" not in parameters_schema:
-        raise ValueError(f"Missing 'visible' field at {path}")
+        if not parameters_schema.get("additionalProperties"):
+            raise ValueError(f"Missing 'visible' field at {path}")
 
     # Ensure additionalProperties field exists
     if "additionalProperties" not in parameters_schema:
@@ -64,9 +68,11 @@ def validate_function_parameters_schema_common(parameters_schema: dict, path: st
                 and prop_name in visible
                 and not prop_schema.get("additionalProperties", False)
             ):
-                raise ValueError(
-                    f"Property '{prop_name}' at {path} cannot be visible when all its children are non-visible"
-                )
+                child_properties = prop_schema.get("properties", {})
+                if child_properties:# Empty properties matches empty visible
+                    raise ValueError(
+                        f"Property '{prop_name}' at {path} cannot be visible when all its children are non-visible"
+                    )
 
 
 def validate_function_parameters_schema_rest_protocol(

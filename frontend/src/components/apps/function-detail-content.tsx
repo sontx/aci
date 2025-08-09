@@ -1,9 +1,8 @@
 "use client";
 import * as React from "react";
-import { type AppFunction } from "@/lib/types/appfunction";
+import { type AppFunction, RestMetadata } from "@/lib/types/appfunction";
 import { Badge } from "@/components/ui/badge";
-import { IdDisplay } from "@/components/apps/id-display";
-import { Plug } from "lucide-react";
+import { Hammer, Plug } from "lucide-react";
 import { MarkdownViewer } from "@/components/ui-extensions/markdown-viewer";
 import {
   Card,
@@ -17,46 +16,86 @@ interface FunctionDetailContentProps {
   func: AppFunction;
 }
 
+function RestProtocolViewer({ metadata }: { metadata: RestMetadata }) {
+  if (!metadata) {
+    return (
+      <div className="text-muted-foreground">No REST metadata available</div>
+    );
+  }
+
+  const serverUrl = metadata.server_url.endsWith("/")
+    ? metadata.server_url.slice(0, -1)
+    : metadata.server_url;
+  const path = metadata.path.startsWith("/")
+    ? metadata.path
+    : `/${metadata.path}`;
+
+  // Assign color based on HTTP method
+  const methodColorMap: Record<string, string> = {
+    GET: "bg-green-500",
+    POST: "bg-blue-500",
+    PUT: "bg-yellow-500",
+    DELETE: "bg-red-500",
+    PATCH: "bg-purple-500",
+    OPTIONS: "bg-gray-500",
+    HEAD: "bg-gray-400",
+  };
+  const badgeColor =
+    methodColorMap[metadata.method.toUpperCase()] || "bg-gray-300";
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Protocol</CardTitle>
+        <CardDescription>
+          This function uses the REST protocol to communicate with external
+          services.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="flex items-center gap-2 text-sm">
+          <Badge className={badgeColor}>{metadata.method}</Badge>
+          <span>
+            <span>{serverUrl}</span>
+            <span className="text-muted-foreground">{path}</span>
+          </span>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export function FunctionDetailContent({ func }: FunctionDetailContentProps) {
   return (
     <div className="grid gap-6">
       <div className="space-y-4">
-        <div className="space-y-2">
-          <div className="text-sm font-medium text-muted-foreground">
-            Function Name
+        <div className="flex items-center gap-4">
+          <div className="relative h-12 w-12 flex-shrink-0 overflow-hidden rounded-lg">
+            <Hammer className="w-12 h-12" />
           </div>
-          <div className="w-fit">
-            <IdDisplay
-              id={func.name}
-              displayName={func.display_name}
-              dim={false}
-            />
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <div className="text-sm font-medium text-muted-foreground">Tags</div>
-          <div className="flex flex-wrap gap-2">
-            {func.tags?.map((tag: string) => (
-              <Badge key={tag} variant="normal" className="capitalize">
-                {tag}
-              </Badge>
-            ))}
-            <Badge variant="normal" className="uppercase">
-              <Plug className="w-3 h-3 mr-1" /> {func.protocol || "Unknown"}
-            </Badge>
+          <div>
+            <h1 className="text-2xl font-bold">{func.display_name}</h1>
+            {func.tags?.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {func.tags?.map((tag: string) => (
+                  <Badge key={tag} variant="normal" className="capitalize">
+                    {tag}
+                  </Badge>
+                ))}
+              </div>
+            )}
           </div>
         </div>
-
-        <div className="space-y-2">
-          <div className="text-sm font-medium text-muted-foreground">
-            Description
+        {func.description && (
+          <div className="max-w-3xl text-sm text-muted-foreground">
+            <MarkdownViewer content={func.description} />
           </div>
-          <div className="bg-muted px-4 py-3 rounded-md">
-            {func.description}
-          </div>
-        </div>
+        )}
       </div>
+
+      {func.protocol === "rest" && (
+        <RestProtocolViewer metadata={func.protocol_data} />
+      )}
 
       <div className="space-y-4">
         {func.parameters && (
@@ -69,7 +108,7 @@ export function FunctionDetailContent({ func }: FunctionDetailContentProps) {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="prose prose-table:text-nowrap">
+              <div className="prose prose-thead:text-nowrap min-w-full">
                 <MarkdownViewer content={func.parameters} />
               </div>
             </CardContent>
@@ -85,7 +124,7 @@ export function FunctionDetailContent({ func }: FunctionDetailContentProps) {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="prose prose-table:text-nowrap">
+              <div className="prose prose-thead:text-nowrap min-w-full">
                 <MarkdownViewer content={func.response} />
               </div>
             </CardContent>

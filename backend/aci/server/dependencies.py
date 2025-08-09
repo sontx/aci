@@ -7,6 +7,7 @@ from uuid import UUID
 from fastapi import Depends, Security
 from fastapi import Request, HTTPException, status
 from fastapi.security import APIKeyHeader, HTTPBearer
+from propelauth_py import User
 from sqlalchemy.orm import Session
 
 from aci.common import utils
@@ -19,8 +20,8 @@ from aci.common.exceptions import (
     ProjectNotFound,
 )
 from aci.common.logging_setup import get_logger
-from aci.server import billing, config
-from aci.server.config import ACI_PROJECT_ID_HEADER
+from aci.server import billing, config, acl
+from aci.server.config import ACI_PROJECT_ID_HEADER, ACI_ORG_ID_HEADER
 
 logger = get_logger(__name__)
 http_bearer = HTTPBearer(auto_error=True, description="login to receive a JWT token")
@@ -30,9 +31,35 @@ api_key_header = APIKeyHeader(
     auto_error=True,
 )
 
+auth = acl.get_propelauth()
+
+
+class OrgContext:
+    def __init__(self, user: User, prefer_org_id: str, project_id: str, db_session: Session):
+        self.user = user
+        self.db_session = db_session
+        self.project_id = UUID(project_id)
+
+        if prefer_org_id:
+            # Check if the preferred org ID is existing in user.get_orgs() and belongs to the user
+            orgs = user.get_orgs()
+            if any(org.org_id == prefer_org_id for org in orgs):
+                self.org_id = prefer_org_id
+        elif user.active_org_id:
+            self.org_id = user.active_org_id
+        else:
+            # If the user has multiple orgs, we can choose the first one
+            first_org = user.get_orgs()[0]
+            if first_org:
+                self.org_id = first_org.org_id
+
+        if not self.org_id:
+            # Raise an error if no org is found
+            raise ValueError("User does not belong to any organization.")
+
 
 class RequestContext:
-    def __init__(self, db_session: Session, project: Project, ):
+    def __init__(self, db_session: Session, project: Project):
         self.db_session = db_session
         self.project = project
 
@@ -174,3 +201,12 @@ def get_request_context(
         db_session=db_session,
         project=project,
     )
+
+
+def get_org_context(
+        user: Annotated[User, Depends(auth.require_user)],
+        db_session: Annotated[Session, Depends(yield_db_session)],
+        prefer_org_id: str = Depends(get_header(ACI_ORG_ID_HEADER)),
+        project_id: str = Depends(get_header(ACI_PROJECT_ID_HEADER)),
+) -> OrgContext:
+    return OrgContext(user, prefer_org_id, project_id, db_session)

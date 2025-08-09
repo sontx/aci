@@ -31,6 +31,7 @@ class AppUpsert(BaseModel, extra="forbid"):
     default_security_credentials_by_scheme: dict[
         SecurityScheme, APIKeySchemeCredentials | OAuth2SchemeCredentials | NoAuthSchemeCredentials
     ]
+    org_id: UUID | None = None
 
     @field_validator("name")
     def validate_name(cls, v: str) -> str:
@@ -129,3 +130,8 @@ class AppDetails(BaseModel):
 
     created_at: datetime
     updated_at: datetime
+
+    org_id: UUID | None
+
+class UserAppDetails(AppDetails):
+    security_schemes: dict[SecurityScheme, APIKeyScheme | OAuth2Scheme | NoAuthScheme]

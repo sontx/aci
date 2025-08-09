@@ -231,7 +231,7 @@ async def remove_tool_from_mcp_server(
     context.db_session.commit()
 
 
-@router.api_route("/{link}/mcp", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
+@router.api_route("/{link}/mcp", methods=["GET", "POST", "PUT", "DELETE", "PATCH"], include_in_schema=False)
 async def mcp_handler(
         link: str,
         request: Request,

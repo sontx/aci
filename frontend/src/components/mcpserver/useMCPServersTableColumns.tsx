@@ -132,7 +132,7 @@ export const useMCPServersTableColumns = (): ColumnDef<MCPServerResponse>[] => {
                           toast.error("Failed to delete MCP server");
                         }
                       }}
-                      className="bg-red-600 hover:bg-red-700"
+                      destructive
                     >
                       Delete
                     </AlertDialogAction>

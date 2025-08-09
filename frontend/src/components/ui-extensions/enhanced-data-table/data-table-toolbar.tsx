@@ -4,13 +4,14 @@ import { Table } from "@tanstack/react-table";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
-import { useState } from "react";
+import React, { useState } from "react";
 
 interface EnhancedDataTableToolbarProps<TData> {
   table: Table<TData>;
   placeholder?: string;
   showSearchInput?: boolean;
   filterComponent?: React.ReactNode;
+  extraActionComponent?: React.ReactNode;
 }
 
 export function EnhancedDataTableToolbar<TData>({
@@ -18,6 +19,7 @@ export function EnhancedDataTableToolbar<TData>({
   placeholder = "Search...",
   showSearchInput,
   filterComponent,
+  extraActionComponent,
 }: EnhancedDataTableToolbarProps<TData>) {
   const [searchValue, setSearchValue] = useState("");
 
@@ -26,7 +28,7 @@ export function EnhancedDataTableToolbar<TData>({
     table.setGlobalFilter(value);
   };
 
-  const isFiltered = table.getState().globalFilter ? true : false;
+  const isFiltered = !!table.getState().globalFilter;
 
   // Don't render toolbar if there's no search input and no filter component
   if (!showSearchInput && !filterComponent) {
@@ -59,6 +61,7 @@ export function EnhancedDataTableToolbar<TData>({
 
         {filterComponent}
       </div>
+      {extraActionComponent}
     </div>
   );
 }

@@ -195,7 +195,8 @@ def _process_properties_recursively(
             if has_default_value
             else ""
         )
-        description = prop_details.get("description", "").strip(" \n")
+        # Replace new line with <br> for better markdown rendering
+        description = prop_details.get("description", "").strip(" \n").replace("\n", "<br>")
 
         examples = ", ".join(
             [f"```{str(example)}```" for example in prop_details.get("examples", [])]

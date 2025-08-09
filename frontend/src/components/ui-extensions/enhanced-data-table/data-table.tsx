@@ -31,7 +31,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useState, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { EnhancedDataTableToolbar } from "@/components/ui-extensions/enhanced-data-table/data-table-toolbar";
 import { ColumnFilter } from "@/components/ui-extensions/enhanced-data-table/column-filter";
 import { getRowSelectionColumn } from "@/components/ui-extensions/enhanced-data-table/row-selection-column";
@@ -48,7 +48,7 @@ interface RowSelectionProps<TData> {
   getRowId: (row: TData) => string;
 }
 
-interface PaginationOptions {
+export interface PaginationOptions {
   initialPageIndex?: number;
   initialPageSize?: number;
   totalCount?: number;
@@ -64,6 +64,7 @@ interface EnhancedDataTableProps<TData, TValue> {
   rowSelectionProps?: RowSelectionProps<TData>;
   paginationOptions?: PaginationOptions;
   loading?: boolean;
+  extraActionComponent?: React.ReactNode;
 }
 
 export function EnhancedDataTable<TData, TValue>({
@@ -74,6 +75,7 @@ export function EnhancedDataTable<TData, TValue>({
   rowSelectionProps,
   paginationOptions,
   loading = false,
+  extraActionComponent,
 }: EnhancedDataTableProps<TData, TValue>) {
   const generatedDefaultSorting = useMemo(() => {
     if (defaultSorting.length > 0) return defaultSorting;
@@ -215,6 +217,7 @@ export function EnhancedDataTable<TData, TValue>({
           placeholder={searchBarProps.placeholder}
           showSearchInput={hasFilterableColumns}
           filterComponent={filterComponents}
+          extraActionComponent={extraActionComponent}
         />
       )}
       <div className="border rounded-lg overflow-hidden">

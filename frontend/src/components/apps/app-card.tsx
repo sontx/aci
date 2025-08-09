@@ -1,4 +1,5 @@
 "use client";
+
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -13,9 +14,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useAppLinkedAccounts } from "@/hooks/use-linked-account";
 import { type App } from "@/lib/types/app";
-import { CheckCircle, CircleUser, Hammer } from "lucide-react";
+import { CheckCircle } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -33,7 +33,7 @@ export function AppCard({ app, isConfigured = false }: AppCardProps) {
             <div className="flex items-center gap-3 min-w-0 flex-1 mr-4">
               <div className="relative h-12 w-12 flex-shrink-0 overflow-hidden rounded-lg">
                 <Image
-                  src={app.logo}
+                  src={app.logo || "/icon/default-app-icon.svg"}
                   alt={`${app.name} logo`}
                   fill
                   className="object-contain"
