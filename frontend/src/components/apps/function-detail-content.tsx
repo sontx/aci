@@ -2,7 +2,7 @@
 import * as React from "react";
 import { type AppFunction, RestMetadata } from "@/lib/types/appfunction";
 import { Badge } from "@/components/ui/badge";
-import { Hammer } from "lucide-react";
+import { Hammer, Play } from "lucide-react";
 import { MarkdownViewer } from "@/components/ui-extensions/markdown-viewer";
 import {
   Card,
@@ -11,6 +11,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { RunFunctionDialog } from "@/components/userapp/run-function-form";
 
 interface FunctionDetailContentProps {
   func: AppFunction;
@@ -68,29 +70,37 @@ function RestProtocolViewer({ metadata }: { metadata: RestMetadata }) {
 export function FunctionDetailContent({ func }: FunctionDetailContentProps) {
   return (
     <div className="grid gap-6">
-      <div className="space-y-4">
-        <div className="flex items-center gap-4">
-          <div className="relative h-12 w-12 flex-shrink-0 overflow-hidden rounded-lg">
-            <Hammer className="w-12 h-12" />
+      <div className="flex items-center justify-between">
+        <div className="space-y-4">
+          <div className="flex items-center gap-4">
+            <div className="relative h-12 w-12 flex-shrink-0 overflow-hidden rounded-lg">
+              <Hammer className="w-12 h-12" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold">{func.display_name}</h1>
+              {func.tags?.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {func.tags?.map((tag: string) => (
+                    <Badge key={tag} variant="normal" className="capitalize">
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-bold">{func.display_name}</h1>
-            {func.tags?.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {func.tags?.map((tag: string) => (
-                  <Badge key={tag} variant="normal" className="capitalize">
-                    {tag}
-                  </Badge>
-                ))}
-              </div>
-            )}
-          </div>
+          {func.description && (
+            <div className="max-w-3xl text-sm text-muted-foreground">
+              <MarkdownViewer content={func.description} />
+            </div>
+          )}
         </div>
-        {func.description && (
-          <div className="max-w-3xl text-sm text-muted-foreground">
-            <MarkdownViewer content={func.description} />
-          </div>
-        )}
+        <RunFunctionDialog functionName={func.name} appName={func.app_name}>
+          <Button>
+            <Play className="h-4 w-4" />
+            Run Function
+          </Button>
+        </RunFunctionDialog>
       </div>
 
       {func.protocol === "rest" && (

@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { Separator } from "@/components/ui/separator";
-import { useUserApp, useDeleteUserApp } from "@/hooks/use-user-app";
+import { useDeleteUserApp, useUserApp } from "@/hooks/use-user-app";
 import { UserAppOverview } from "@/components/userapp/user-app-overview";
 import { UserAppFunctions } from "@/components/userapp/user-app-functions";
 import { AlertCircle, Edit, Loader2, Trash2 } from "lucide-react";
@@ -19,9 +19,13 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
+import {
+  MoreButton,
+  SecondaryAction,
+} from "@/components/ui-extensions/more-button";
+import { useMemo, useState } from "react";
 
 export default function UserAppDetailsPage() {
   const params = useParams();
@@ -30,6 +34,22 @@ export default function UserAppDetailsPage() {
 
   const { data: userApp, isPending, isError } = useUserApp(appName);
   const { mutateAsync: deleteUserApp } = useDeleteUserApp();
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+
+  const secondaryActions = useMemo<SecondaryAction[]>(
+    () => [
+      {
+        label: "Delete App",
+        description: "Permanently delete this user app and all functions",
+        icon: <Trash2 className="h-4 w-4" />,
+        onClick: () => {
+          setShowDeleteDialog(true);
+        },
+        destructive: true,
+      },
+    ],
+    [],
+  );
 
   if (isPending) {
     return (
@@ -74,48 +94,17 @@ export default function UserAppDetailsPage() {
           )}
         </div>
         <div className="flex gap-2">
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="destructive">
-                <Trash2 className="h-4 w-4" />
-                Delete App
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete User App</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Are you sure you want to delete the user app{" "}
-                  <strong>{userApp.display_name}</strong>? This action cannot be
-                  undone and will remove all associated functions and data.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={async () => {
-                    try {
-                      await deleteUserApp(userApp.name);
-                      router.push("/my-apps");
-                    } catch (error) {
-                      console.error("Failed to delete user app:", error);
-                      toast.error("Failed to delete user app");
-                    }
-                  }}
-                  destructive
-                >
-                  Delete
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-
-          <UserAppForm title="Edit User App" userAppName={userApp.name}>
-            <Button>
-              <Edit className="h-4 w-4" />
-              Edit App
-            </Button>
-          </UserAppForm>
+          <MoreButton
+            primaryActionComponent={
+              <UserAppForm title="Edit User App" userAppName={userApp.name}>
+                <Button className="rounded-r-none border-r-0">
+                  <Edit className="h-4 w-4" />
+                  Edit App
+                </Button>
+              </UserAppForm>
+            }
+            secondaryActions={secondaryActions}
+          />
         </div>
       </div>
 
@@ -130,6 +119,36 @@ export default function UserAppDetailsPage() {
       <div className="m-4">
         <UserAppFunctions userApp={userApp} />
       </div>
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete User App</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the user app{" "}
+              <strong>{userApp.display_name}</strong>? This action cannot be
+              undone and will remove all associated functions and data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                try {
+                  await deleteUserApp(userApp.name);
+                  router.push("/my-apps");
+                } catch (error) {
+                  console.error("Failed to delete user app:", error);
+                  toast.error("Failed to delete user app");
+                }
+              }}
+              destructive
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

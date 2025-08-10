@@ -1,9 +1,9 @@
 import json
 from datetime import UTC, datetime
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
-from openai import OpenAI
 from sqlalchemy.orm import Session
 
 from aci.common.db import crud
@@ -135,10 +135,18 @@ async def get_function_definition(
         True,
     )
     if not function:
-        logger.error(
-            f"Failed to get function definition, function not found, function_name={function_name}"
+        # Try to get the function by name from user apps
+        function = crud.functions.get_user_function_by_name(
+            context.db_session,
+            function_name,
+            org_id=context.org_id,
         )
-        raise FunctionNotFound(f"function={function_name} not found")
+
+        if not function:
+            logger.error(
+                f"Failed to get function definition, function not found, function_name={function_name}"
+            )
+            raise FunctionNotFound(f"function={function_name} not found")
 
     function_definition = format_function_definition(function, format)
 
@@ -174,6 +182,7 @@ async def execute(
         function_name=function_name,
         function_input=body.function_input,
         linked_account_owner_id=body.linked_account_owner_id,
+        org_id=context.org_id,
     )
 
     end_time = datetime.now(UTC)
@@ -222,6 +231,7 @@ async def execute_function(
     function_name: str,
     function_input: dict,
     linked_account_owner_id: str,
+    org_id: str | None = None,
 ) -> FunctionExecutionResult:
     """
     Execute a function with the given parameters.
@@ -251,10 +261,18 @@ async def execute_function(
         True,
     )
     if not function:
-        logger.error(
-            f"Failed to execute function, function not found, function_name={function_name}"
+        # Try to get the function by name from user apps
+        function = crud.functions.get_user_function_by_name(
+            db_session,
+            function_name,
+            org_id=UUID(org_id),
         )
-        raise FunctionNotFound(f"function={function_name} not found")
+
+        if not function:
+            logger.error(
+                f"Failed to execute function, function not found, function_name={function_name}"
+            )
+            raise FunctionNotFound(f"function={function_name} not found")
 
     # Check if the App (that this function belongs to) is configured
     app_configuration = crud.app_configurations.get_app_configuration(

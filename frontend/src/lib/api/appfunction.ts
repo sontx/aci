@@ -61,10 +61,10 @@ export async function searchFunctions(
   return response.data;
 }
 
-export async function getAppFunction(name: string): Promise<AppFunction> {
+export async function getAppFunction(name: string, format?: string): Promise<AppFunction> {
   const response = await axiosInstance.get(`/v1/functions/${name}/definition`, {
     params: {
-      format: "raw",
+      format: format || "prettier",
     },
   });
 

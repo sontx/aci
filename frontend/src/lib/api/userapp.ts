@@ -48,13 +48,9 @@ export async function deleteUserApp(appName: string): Promise<void> {
 
 export async function getUserAppFunctions(
   appName: string,
-  raw: boolean = false,
 ): Promise<AppFunction[]> {
   const response = await axiosInstance.get(
     `/v1/user-apps/${appName}/functions`,
-    {
-      params: { raw },
-    },
   );
   return response.data;
 }
@@ -62,7 +58,7 @@ export async function getUserAppFunctions(
 export async function getUserAppFunction(name: string): Promise<AppFunction> {
   const response = await axiosInstance.get(`/v1/user-functions/${name}`, {
     params: {
-      format: "raw",
+      format: "prettier",
     },
   });
 

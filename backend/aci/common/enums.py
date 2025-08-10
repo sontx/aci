@@ -75,6 +75,7 @@ class FunctionDefinitionFormat(StrEnum):
     format for a function definition.
     """
 
+    PRETTIER = "prettier"  # return a prettified function definition
     RAW = "raw"  # return raw function details
     BASIC = "basic"  # only return name and description
     OPENAI = "openai"

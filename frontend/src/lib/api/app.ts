@@ -51,10 +51,7 @@ export async function getApp(appName: string): Promise<App | null> {
 
 export async function getAppFunctions(
   appName: string,
-  raw: boolean,
 ): Promise<BasicFunctionDefinition[] | AppFunction[]> {
-  const response = await axiosInstance.get(
-    `/v1/apps/${appName}/functions?raw=${raw}`,
-  );
+  const response = await axiosInstance.get(`/v1/apps/${appName}/functions`);
   return response.data;
 }

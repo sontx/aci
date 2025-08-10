@@ -1,3 +1,5 @@
+import json
+
 from aci.common import processor
 from aci.common.db.sql_models import Function
 from aci.common.enums import FunctionDefinitionFormat
@@ -28,9 +30,27 @@ def format_function_definition(
         | FunctionDetails
 ):
     match format:
-        case FunctionDefinitionFormat.RAW:
+        case FunctionDefinitionFormat.PRETTIER:
             parameter_markdown = generate_jsonschema_to_markdown(function.parameters) if function.parameters else ""
             response_markdown = generate_jsonschema_to_markdown(function.response) if function.response else ""
+            return FunctionDetails(
+                id=function.id,
+                app_name=function.app_name,
+                name=function.name,
+                description=function.description,
+                tags=function.tags,
+                visibility=function.visibility,
+                active=function.active,
+                protocol=function.protocol,
+                protocol_data=function.protocol_data,
+                response=response_markdown,
+                parameters=parameter_markdown,
+                created_at=function.created_at,
+                updated_at=function.updated_at,
+            )
+        case FunctionDefinitionFormat.RAW:
+            parameter_markdown = json.dumps(function.parameters) if function.parameters else ""
+            response_markdown = json.dumps(function.response) if function.response else ""
             return FunctionDetails(
                 id=function.id,
                 app_name=function.app_name,

@@ -15,7 +15,8 @@ export interface AppFunction {
 
 export interface FunctionExecute {
   function_input: object;
-  linked_account_owner_id: string;
+  linked_account_owner_id?: string;
+  app_name?: string; // Optional, only needed if the function is part of a user app
 }
 
 export interface FunctionExecutionResult {

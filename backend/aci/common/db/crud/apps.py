@@ -4,7 +4,7 @@ CRUD operations for apps. (not including app_configurations)
 
 from uuid import UUID
 
-from sqlalchemy import select, update, or_, func
+from sqlalchemy import select, update, or_, func, exists
 from sqlalchemy.orm import Session
 
 from aci.common.config import APP_ORG_PREFIX
@@ -216,42 +216,23 @@ def set_app_visibility(db_session: Session, app_name: str, visibility: Visibilit
     db_session.execute(statement)
 
 
-def _generate_org_app_name(user_display_name: str, org_id: UUID) -> str:
+def _generate_org_app_name(db_session: Session, user_display_name: str) -> str:
     """Generate the actual app name for organization apps with prefix."""
-    # Convert to uppercase and add org prefix
-    return f"{APP_ORG_PREFIX}{format_to_screaming_snake_case(user_display_name)}"
+    candidate_app_name = format_to_screaming_snake_case(user_display_name)
 
+    # Check if the candidate name is not existing in the global apps by querying the database
+    statement = select(
+        exists().where(
+            App.org_id.is_(None),  # Only check global apps
+            App.name == candidate_app_name,
+        )
+    )
+    exists_global_app = db_session.execute(statement).scalar_one_or_none()
+    if exists_global_app:
+        # Use a unique name by appending a suffix
+        return f"{APP_ORG_PREFIX}{format_to_screaming_snake_case(user_display_name)}"
 
-def _check_app_name_conflicts(
-        db_session: Session,
-        app_name: str,
-        org_id: UUID | None = None,
-        exclude_app_id: UUID | None = None
-) -> None:
-    """
-    Check if the app name conflicts with existing apps.
-    For org apps, check against both global apps and other org apps.
-    """
-    # Build base query
-    statement = select(App).filter(App.name == app_name)
-
-    # Exclude current app if updating
-    if exclude_app_id:
-        statement = statement.filter(App.id != exclude_app_id)
-
-    # For org apps, check against global apps and same org apps
-    if org_id is not None:
-        statement = statement.filter(or_(App.org_id == org_id))
-    else:
-        # For global apps, check against all apps (global and org)
-        pass  # No additional filter needed
-
-    existing_app = db_session.execute(statement).scalar_one_or_none()
-    if existing_app:
-        if existing_app.org_id is None:
-            raise ConflictError(f"App name '{app_name}' conflicts with existing global app")
-        else:
-            raise ConflictError(f"App name '{app_name}' already exists in your organization")
+    return candidate_app_name
 
 
 def create_user_app(
@@ -264,13 +245,8 @@ def create_user_app(
     """
     logger.debug(f"Creating user app: {app_upsert} for org_id: {org_id}")
 
-    # Generate app name from display name
-
-    # Generate the actual app name with org prefix
-    actual_app_name = _generate_org_app_name(app_upsert.display_name, org_id)
-
-    # Check for name conflicts
-    _check_app_name_conflicts(db_session, actual_app_name, org_id)
+    # Find the best candidate app name
+    actual_app_name = _generate_org_app_name(db_session, app_upsert.display_name)
 
     # Prepare app data
     app_data = app_upsert.model_dump(mode="json", exclude_none=True)

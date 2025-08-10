@@ -347,8 +347,8 @@ def _create_definition_table(schema: dict, defs: dict, hide_empty_columns: bool)
 
 def _get_property_ref(ref, defs):
     ref = ref.split("/")[-1]
-    t = defs[ref].get("type")
     if ref in defs:
+        t = defs[ref].get("type")
         return (
             f"`{t}`" if t else "Missing type",
             f"[{ref}](#{ref.replace(' ', '-').lower()})",

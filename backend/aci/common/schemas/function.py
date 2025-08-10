@@ -137,6 +137,10 @@ class FunctionExecute(BaseModel):
         max_length=MAX_STRING_LENGTH,
         description="The owner id of the linked account. This is the id of the linked account owner in the linked account provider.",
     )
+    app_name: str | None = Field(
+        default=None,
+        description="The name of the app to which the function belongs. This is required if the function belongs to an user app (not a public app)."
+    )
 
 
 class FunctionDetails(BaseModel):

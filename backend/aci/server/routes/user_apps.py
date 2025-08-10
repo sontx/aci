@@ -195,7 +195,6 @@ async def delete_user_app(
 async def get_user_app_functions(
         context: Annotated[OrgContext, Depends(get_org_context)],
         app_name: str,
-        raw: bool = Query(False, description="Return raw functions without formatting"),
 ) -> list[BasicFunctionDefinition] | list[FunctionDetails]:
     """
     Get all functions of a user app by name.
@@ -208,8 +207,7 @@ async def get_user_app_functions(
     )
 
     app_functions = [
-        format_function_definition(function,
-                                   format=FunctionDefinitionFormat.BASIC if not raw else FunctionDefinitionFormat.RAW)
+        format_function_definition(function, format=FunctionDefinitionFormat.BASIC)
         for function in app_functions_raw
     ]
 

@@ -25,7 +25,7 @@ const AppPage = () => {
   const { appName } = useParams<{ appName: string }>();
   const { data: app } = useApp(appName);
   const { data: functions = [], isPending: isFunctionsPending } =
-    useAppFunctions(appName, true);
+    useAppFunctions(appName);
   const { data: appConfig, isPending: isAppConfigLoading } =
     useAppConfig(appName);
 

@@ -13,14 +13,12 @@ type UseToolExecutionProps = {
     result: object;
   }) => void;
   linkedAccountOwnerId: string;
-  apiKey: string;
 };
 
 export const useToolExecution = ({
   toolInvocation,
   addToolResult,
   linkedAccountOwnerId,
-  apiKey,
 }: UseToolExecutionProps) => {
   const { args, toolName } = toolInvocation;
   const hasStartedChecking = useRef<Set<string>>(new Set());
@@ -41,7 +39,6 @@ export const useToolExecution = ({
           function_input: args as Record<string, unknown>,
           linked_account_owner_id: linkedAccountOwnerId,
         },
-        apiKey,
       );
 
       addToolResult({
@@ -62,7 +59,6 @@ export const useToolExecution = ({
     args,
     addToolResult,
     linkedAccountOwnerId,
-    apiKey,
   ]);
 
   const debouncedExecute = useDebounceCallback(executeToolCallback, 1000);

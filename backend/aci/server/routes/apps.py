@@ -131,7 +131,6 @@ async def get_app_details(
 async def get_app_functions(
         context: Annotated[OrgContext, Depends(get_org_context)],
         app_name: str,
-        raw: bool = Query(False, description="Return raw functions without formatting"),
 ) -> list[BasicFunctionDefinition] | list[FunctionDetails]:
     """
     Get all functions of an application.
@@ -149,8 +148,7 @@ async def get_app_functions(
         raise AppNotFound(f"App={app_name} not found")
 
     app_functions = [
-        format_function_definition(function,
-                                   format=FunctionDefinitionFormat.BASIC if not raw else FunctionDefinitionFormat.RAW)
+        format_function_definition(function, format=FunctionDefinitionFormat.BASIC)
         for function in app.functions
     ]
 
