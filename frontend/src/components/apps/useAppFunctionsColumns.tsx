@@ -17,7 +17,7 @@ export const useAppFunctionsColumns = (): ColumnDef<AppFunction>[] => {
         header: "Function Name",
         cell: (info) => (
           <IdDisplay
-            href={`/apps/${appName}/${info.row.original.name}`}
+            href={`/apps/${appName}/functions/${info.row.original.name}`}
             id={info.row.original.name}
             displayName={info.getValue()}
             dim={false}
