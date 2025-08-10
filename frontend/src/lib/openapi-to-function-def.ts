@@ -425,11 +425,12 @@ export async function openApiToFunctionUpserts(
       })) as OpenAPIV3.Document)
     : ((await parser.bundle(docOrPath as any)) as OpenAPIV3.Document);
 
-  return convertBundledDoc(bundled, {
+  const result = convertBundledDoc(bundled, {
     inferRequired: "none",
     truncateDepth: 1,
     ...opts?.visibleRequired,
   });
+  return normalizeQueryParams(result);
 }
 
 function convertBundledDoc(
@@ -476,4 +477,39 @@ function convertBundledDoc(
   }
 
   return out;
+}
+
+function normalizeQueryParams(functions: FunctionUpsert[]): FunctionUpsert[] {
+  return functions.map((func) => {
+    const rawQuery = func.parameters?.properties?.query;
+    if (rawQuery?.type === "object" && rawQuery?.properties) {
+      const properties = rawQuery.properties as Record<string, any>;
+      const normalizedProps: Record<string, any> = {};
+      for (const [key, value] of Object.entries(properties)) {
+        if (value.type === "object" && value.properties) {
+          Object.assign(normalizedProps, value.properties);
+
+          if (rawQuery.visible.includes(key)) {
+            rawQuery.visible.push(...value.visible);
+          }
+          rawQuery.visible = rawQuery.visible.filter(
+            (requiredKey: string) => requiredKey !== key,
+          );
+
+          if (rawQuery.required.includes(key)) {
+            rawQuery.required.push(...value.required);
+          }
+          rawQuery.required = rawQuery.required.filter(
+            (requiredKey: string) => requiredKey !== key,
+          );
+        } else {
+          normalizedProps[key] = value;
+        }
+      }
+
+      func.parameters.properties.query.properties = normalizedProps;
+    }
+
+    return func;
+  });
 }
