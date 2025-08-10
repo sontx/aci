@@ -131,7 +131,7 @@ class AppDetails(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    org_id: UUID | None
+    project_id: UUID | None
 
 class UserAppDetails(AppDetails):
     security_schemes: dict[SecurityScheme, APIKeyScheme | OAuth2Scheme | NoAuthScheme]

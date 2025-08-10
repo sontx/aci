@@ -138,7 +138,7 @@ def get_functions_by_app_id(db_session: Session, app_id: UUID) -> list[Function]
 def get_function(
         db_session: Session, function_name: str, public_only: bool, active_only: bool
 ) -> Function | None:
-    statement = select(Function).filter(Function.org_id.is_(None), Function.name == function_name)
+    statement = select(Function).filter(Function.project_id.is_(None), Function.name == function_name)
 
     # filter out all functions of inactive apps and all inactive functions
     # (where app is active buy specific functions can be inactive)
@@ -161,27 +161,27 @@ def get_function(
 def get_user_function_by_name(
         db_session: Session,
         function_name: str,
-        org_id: UUID,
+        project_id: UUID,
 ) -> Function | None:
     """
-    Get a user function by name, filtered by org_id.
+    Get a user function by name, filtered by project_id.
     """
-    statement = select(Function).filter(Function.org_id == org_id, Function.name == function_name)
+    statement = select(Function).filter(Function.project_id == project_id, Function.name == function_name)
     return db_session.execute(statement).scalar_one_or_none()
 
 
 def get_user_functions_by_app_name(
         db_session: Session,
         app_name: str,
-        org_id: UUID,
+        project_id: UUID,
 ) -> list[Function]:
     """
-    Get all functions of a user app by app name, filtered by org_id.
+    Get all functions of a user app by app name, filtered by project_id.
     """
     statement = (
         select(Function)
         .join(App, Function.app_id == App.id)
-        .filter(App.name == app_name, App.org_id == org_id)
+        .filter(App.name == app_name, App.project_id == project_id)
     )
 
     statement = statement.order_by(Function.name)
@@ -191,19 +191,19 @@ def get_user_functions_by_app_name(
 def delete_user_function(
         db_session: Session,
         function_name: str,
-        org_id: UUID,
+        project_id: UUID,
 ) -> None:
     """
-    Delete a user function by name, filtered by org_id.
+    Delete a user function by name, filtered by project_id.
     """
-    logger.debug(f"Deleting user function: {function_name} for org_id: {org_id}")
+    logger.debug(f"Deleting user function: {function_name} for project_id: {project_id}")
 
-    function = get_user_function_by_name(db_session, function_name, org_id)
+    function = get_user_function_by_name(db_session, function_name, project_id)
     if not function:
         raise FunctionNotFound(f"Function with name {function_name} not found on your organization")
 
     # Verify it's not a global function (additional safety check)
-    if function.org_id is None:
+    if function.project_id is None:
         raise ConflictError("Cannot delete global function")
 
     db_session.delete(function)
@@ -216,16 +216,16 @@ def create_user_functions(
         functions_upsert: list[FunctionUpsert],
         override_existing: bool,
         remove_previous: bool,
-        org_id: UUID,
+        project_id: UUID,
 ) -> list[Function]:
     """
     Create user functions for a specific organization.
     """
-    logger.debug(f"Creating user functions for app name {app_name}, org_id={org_id}, override_existing={override_existing}, remove_previous={remove_previous}")
+    logger.debug(f"Creating user functions for app name {app_name}, project_id={project_id}, override_existing={override_existing}, remove_previous={remove_previous}")
 
-    app = crud.apps.get_user_app_by_name(db_session, app_name, org_id)
+    app = crud.apps.get_user_app_by_name(db_session, app_name, project_id)
     if not app:
-        logger.error(f"User app={app_name} does not exist for org_id={org_id}")
+        logger.error(f"User app={app_name} does not exist for project_id={project_id}")
         raise AppNotFound(f"User app {app_name} does not exist")
 
     # Normalize function names to ensure they are unique within the app
@@ -237,7 +237,7 @@ def create_user_functions(
 
     # Handle removal of previous functions if requested
     if remove_previous:
-        existing_functions = get_user_functions_by_app_name(db_session, app_name, org_id)
+        existing_functions = get_user_functions_by_app_name(db_session, app_name, project_id)
         functions_to_remove = [func for func in existing_functions if func.name not in upsert_function_names]
 
         for func_to_remove in functions_to_remove:
@@ -247,7 +247,7 @@ def create_user_functions(
     functions = []
     for function_upsert in functions_upsert:
         # Check if function already exists
-        existing_function = get_user_function_by_name(db_session, function_upsert.name, org_id)
+        existing_function = get_user_function_by_name(db_session, function_upsert.name, project_id)
 
         if existing_function:
             if override_existing:
@@ -268,7 +268,7 @@ def create_user_functions(
             function = Function(
                 **function_data,
                 app_id=app.id,
-                org_id=org_id,
+                project_id=project_id,
             )
             db_session.add(function)
             functions.append(function)
@@ -280,16 +280,16 @@ def create_user_functions(
 def update_user_functions(
         db_session: Session,
         function_upsert: FunctionUpsert,
-        org_id: UUID,
+        project_id: UUID,
 ) -> Function:
     """
     Update user functions for a specific organization.
     """
-    logger.debug(f"Updating user function, functions_upsert={function_upsert.name}, org_id={org_id}")
+    logger.debug(f"Updating user function, functions_upsert={function_upsert.name}, project_id={project_id}")
 
-    function = get_user_function_by_name(db_session, function_upsert.name, org_id)
+    function = get_user_function_by_name(db_session, function_upsert.name, project_id)
     if not function:
-        logger.error(f"User function={function_upsert.name} does not exist for org_id={org_id}")
+        logger.error(f"User function={function_upsert.name} does not exist for project_id={project_id}")
         raise FunctionNotFound(f"User function={function_upsert.name} does not exist on your organization")
 
     function_data = function_upsert.model_dump(mode="json", exclude_unset=True)

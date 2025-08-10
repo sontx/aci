@@ -90,6 +90,9 @@ if config.ENVIRONMENT != "local":
     logfire.instrument_fastapi(app, capture_headers=True)
     logfire.instrument_sqlalchemy()
 
+logging.basicConfig()
+logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
+
 """middlewares are executed in the reverse order"""
 # app.add_middleware(RateLimitMiddleware)
 app.add_middleware(SessionMiddleware, secret_key=config.SIGNING_KEY)
@@ -139,32 +142,27 @@ app.include_router(
     projects.router,
     prefix=config.ROUTER_PREFIX_PROJECTS,
     tags=[config.ROUTER_PREFIX_PROJECTS.split("/")[-1]],
-    dependencies=[Depends(auth.require_user)],
 )
 # TODO: add validate_project_quota to all routes
 app.include_router(
     apps.router,
     prefix=config.ROUTER_PREFIX_APPS,
     tags=[config.ROUTER_PREFIX_APPS.split("/")[-1]],
-    dependencies=[Depends(deps.validate_project_quota)],
 )
 app.include_router(
     user_apps.router,
     prefix=config.ROUTER_PREFIX_USER_APPS,
     tags=[config.ROUTER_PREFIX_USER_APPS.split("/")[-1]],
-    dependencies=[Depends(deps.validate_project_quota)],
 )
 app.include_router(
     user_functions.router,
     prefix=config.ROUTER_PREFIX_USER_FUNCTIONS,
     tags=[config.ROUTER_PREFIX_USER_FUNCTIONS.split("/")[-1]],
-    dependencies=[Depends(deps.validate_project_quota)],
 )
 app.include_router(
     functions.router,
     prefix=config.ROUTER_PREFIX_FUNCTIONS,
     tags=[config.ROUTER_PREFIX_FUNCTIONS.split("/")[-1]],
-    dependencies=[Depends(deps.validate_project_quota)],
 )
 app.include_router(
     app_configurations.router,
@@ -185,12 +183,15 @@ app.include_router(
     tags=[config.ROUTER_PREFIX_ANALYTICS.split("/")[-1]],
 )
 
+# No auth required for webhooks, as they are called by external services
 app.include_router(
     webhooks.router,
     prefix=config.ROUTER_PREFIX_WEBHOOKS,
     tags=[config.ROUTER_PREFIX_WEBHOOKS.split("/")[-1]],
 )
 
+# No auth required for billing, because there is a webhook callback endpoint.
+# Other endpoints will be protected by itself.
 app.include_router(
     billing.router,
     prefix=config.ROUTER_PREFIX_BILLING,

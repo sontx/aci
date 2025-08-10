@@ -68,12 +68,12 @@ def update_app_default_security_credentials(
 def get_app_by_name(
         db_session: Session,
         app_name: str,
-        org_id: UUID | None = None,
+        project_id: UUID | None = None,
 ) -> App | None:
     statement = select(App).filter_by(name=app_name)
-    # Filter to show global apps (org_id is None) and user's org apps
-    if org_id is not None:
-        statement = statement.filter(or_(App.org_id.is_(None), App.org_id == org_id))
+    # Filter to show global apps (project_id is None) and user's org apps
+    if project_id is not None:
+        statement = statement.filter(or_(App.project_id.is_(None), App.project_id == project_id))
     app: App | None = db_session.execute(statement).scalar_one_or_none()
     return app
 
@@ -83,7 +83,7 @@ def get_app(
         app_name: str,
         public_only: bool,
         active_only: bool,
-        org_id: UUID | None = None
+        project_id: UUID | None = None
 ) -> App | None:
     statement = select(App).filter_by(name=app_name)
 
@@ -92,9 +92,9 @@ def get_app(
     if public_only:
         statement = statement.filter(App.visibility == Visibility.PUBLIC)
 
-    # Filter to show global apps (org_id is None) and user's org apps
-    if org_id is not None:
-        statement = statement.filter(or_(App.org_id.is_(None), App.org_id == org_id))
+    # Filter to show global apps (project_id is None) and user's org apps
+    if project_id is not None:
+        statement = statement.filter(or_(App.project_id.is_(None), App.project_id == project_id))
 
     app: App | None = db_session.execute(statement).scalar_one_or_none()
     return app
@@ -104,7 +104,7 @@ def _build_filtered_app_query(
         public_only: bool,
         active_only: bool,
         app_names: list[str] | None,
-        org_id: UUID | None,
+        project_id: UUID | None,
         search: str | None = None,
         categories: list[str] | None = None,
 ):
@@ -118,9 +118,9 @@ def _build_filtered_app_query(
     if app_names is not None:
         statement = statement.filter(App.name.in_(app_names))
 
-    # Filter to show global apps (org_id is None) and user's org apps
-    if org_id is not None:
-        statement = statement.filter(or_(App.org_id.is_(None), App.org_id == org_id))
+    # Filter to show global apps (project_id is None) and user's org apps
+    if project_id is not None:
+        statement = statement.filter(or_(App.project_id.is_(None), App.project_id == project_id))
 
     # Add search functionality at database level
     if search:
@@ -145,14 +145,14 @@ def get_apps(
         public_only: bool,
         active_only: bool,
         app_names: list[str] | None,
-        org_id: UUID | None = None,
+        project_id: UUID | None = None,
         search: str | None = None,
         categories: list[str] | None = None,
         limit: int | None = None,
         offset: int | None = None,
 ) -> list[App]:
     statement = _build_filtered_app_query(
-        public_only, active_only, app_names, org_id, search, categories
+        public_only, active_only, app_names, project_id, search, categories
     )
 
     # Order by name for consistent results
@@ -171,13 +171,13 @@ def count_apps(
         public_only: bool,
         active_only: bool,
         app_names: list[str] | None,
-        org_id: UUID | None = None,
+        project_id: UUID | None = None,
         search: str | None = None,
         categories: list[str] | None = None,
 ) -> int:
     """Count apps matching the given criteria."""
     statement = _build_filtered_app_query(
-        public_only, active_only, app_names, org_id, search, categories
+        public_only, active_only, app_names, project_id, search, categories
     )
 
     # Replace the select with count
@@ -190,11 +190,11 @@ def get_all_categories(
         db_session: Session,
         public_only: bool,
         active_only: bool,
-        org_id: UUID | None = None,
+        project_id: UUID | None = None,
 ) -> list[str]:
     """Get all unique categories from apps."""
     statement = _build_filtered_app_query(
-        public_only, active_only, None, org_id, None, None
+        public_only, active_only, None, project_id, None, None
     )
 
     # Replace the select with unnest categories
@@ -223,7 +223,7 @@ def _generate_org_app_name(db_session: Session, user_display_name: str) -> str:
     # Check if the candidate name is not existing in the global apps by querying the database
     statement = select(
         exists().where(
-            App.org_id.is_(None),  # Only check global apps
+            App.project_id.is_(None),  # Only check global apps
             App.name == candidate_app_name,
         )
     )
@@ -238,12 +238,12 @@ def _generate_org_app_name(db_session: Session, user_display_name: str) -> str:
 def create_user_app(
         db_session: Session,
         app_upsert: AppUpsert,
-        org_id: UUID,
+        project_id: UUID,
 ) -> App:
     """
     Create a user app with org prefix naming convention.
     """
-    logger.debug(f"Creating user app: {app_upsert} for org_id: {org_id}")
+    logger.debug(f"Creating user app: {app_upsert} for project_id: {project_id}")
 
     # Find the best candidate app name
     actual_app_name = _generate_org_app_name(db_session, app_upsert.display_name)
@@ -251,7 +251,7 @@ def create_user_app(
     # Prepare app data
     app_data = app_upsert.model_dump(mode="json", exclude_none=True)
     app_data["name"] = actual_app_name
-    app_data["org_id"] = org_id
+    app_data["project_id"] = project_id
 
     app = App(**app_data)
 
@@ -265,16 +265,16 @@ def update_user_app(
         db_session: Session,
         app_name: str,
         app_upsert: AppUpsert,
-        org_id: UUID,
+        project_id: UUID,
 ) -> App:
     """
     Update an existing user app by name.
     Note: App name cannot be changed once created.
     """
-    logger.debug(f"Updating user app: {app_name} for org_id: {org_id}")
+    logger.debug(f"Updating user app: {app_name} for project_id: {project_id}")
 
     # Get the app and verify it belongs to the org
-    app = get_user_app_by_name(db_session, app_name, org_id)
+    app = get_user_app_by_name(db_session, app_name, project_id)
     if not app:
         raise ConflictError("App not found or does not belong to your organization")
 
@@ -297,20 +297,20 @@ def update_user_app(
 def delete_user_app(
         db_session: Session,
         app_name: str,
-        org_id: UUID,
+        project_id: UUID,
 ) -> None:
     """
-    Delete a user app by name and org_id.
+    Delete a user app by name and project_id.
     """
-    logger.debug(f"Deleting user app: {app_name} for org_id: {org_id}")
+    logger.debug(f"Deleting user app: {app_name} for project_id: {project_id}")
 
     # Get the app and verify it belongs to the org
-    app = get_user_app_by_name(db_session, app_name, org_id)
+    app = get_user_app_by_name(db_session, app_name, project_id)
     if not app:
         raise ConflictError("App not found or does not belong to your organization")
 
     # Verify it's not a global app (additional safety check)
-    if app.org_id is None:
+    if app.project_id is None:
         raise ConflictError("Cannot delete global app")
 
     db_session.delete(app)
@@ -320,13 +320,13 @@ def delete_user_app(
 def get_user_app(
         db_session: Session,
         app_name: str,
-        org_id: UUID,
+        project_id: UUID,
         active_only: bool = True,
 ) -> App | None:
     """
     Get a user app by name (user-provided name, not the actual stored name).
     """
-    statement = select(App).filter_by(name=app_name, org_id=org_id)
+    statement = select(App).filter_by(name=app_name, project_id=project_id)
 
     if active_only:
         statement = statement.filter(App.active)
@@ -336,7 +336,7 @@ def get_user_app(
 
 def get_user_apps(
         db_session: Session,
-        org_id: UUID,
+        project_id: UUID,
         active_only: bool = True,
         search: str | None = None,
         categories: list[str] | None = None,
@@ -346,7 +346,7 @@ def get_user_apps(
     """
     Get all apps belonging to a specific organization.
     """
-    statement = select(App).filter(App.org_id == org_id)
+    statement = select(App).filter(App.project_id == project_id)
 
     if active_only:
         statement = statement.filter(App.active)
@@ -379,7 +379,7 @@ def get_user_apps(
 
 def count_user_apps(
         db_session: Session,
-        org_id: UUID,
+        project_id: UUID,
         active_only: bool = True,
         search: str | None = None,
         categories: list[str] | None = None,
@@ -387,7 +387,7 @@ def count_user_apps(
     """
     Count apps belonging to a specific organization.
     """
-    statement = select(func.count(App.id)).filter(App.org_id == org_id)
+    statement = select(func.count(App.id)).filter(App.project_id == project_id)
 
     if active_only:
         statement = statement.filter(App.active)
@@ -429,18 +429,18 @@ def to_app_details(app) -> AppDetails:
         supported_security_schemes=SecuritySchemesPublic.model_validate(app.security_schemes),
         created_at=app.created_at,
         updated_at=app.updated_at,
-        org_id=app.org_id,
+        project_id=app.project_id,
     )
 
 
 def get_user_app_by_name(
         db_session: Session,
         app_name: str,
-        org_id: UUID,
+        project_id: UUID,
 ) -> App | None:
     """
-    Get a user app by name and org_id.
+    Get a user app by name and project_id.
     This looks for the actual stored app name (with org prefix).
     """
-    statement = select(App).filter_by(name=app_name, org_id=org_id)
+    statement = select(App).filter_by(name=app_name, project_id=project_id)
     return db_session.execute(statement).scalar_one_or_none()

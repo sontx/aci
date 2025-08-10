@@ -13,7 +13,7 @@ from aci.common.schemas.app import (
 )
 from aci.common.schemas.common import Paged
 from aci.common.schemas.function import BasicFunctionDefinition, FunctionDetails
-from aci.server.dependencies import OrgContext, get_org_context
+from aci.server.dependencies import RequestContext, get_request_context
 from aci.server.utils import format_function_definition
 
 logger = get_logger(__name__)
@@ -22,7 +22,7 @@ router = APIRouter()
 
 @router.get("", response_model_exclude_none=True)
 async def list_apps(
-        context: Annotated[OrgContext, Depends(get_org_context)],
+        context: Annotated[RequestContext, Depends(get_request_context)],
         query_params: Annotated[AppList, Query()],
 ) -> list[AppDetails]:
     """
@@ -33,7 +33,7 @@ async def list_apps(
         True,
         True,
         query_params.app_names,
-        context.org_id,
+        context.project.id,
         None,  # search
         None,  # categories
         None,  # limit
@@ -50,7 +50,7 @@ async def list_apps(
 
 @router.get("/search", response_model_exclude_none=True)
 async def search_apps(
-        context: Annotated[OrgContext, Depends(get_org_context)],
+        context: Annotated[RequestContext, Depends(get_request_context)],
         query_params: Annotated[AppsSearch, Query()],
 ) -> Paged[AppDetails]:
     """
@@ -62,7 +62,7 @@ async def search_apps(
         True,
         True,
         None,  # app_names
-        context.org_id,
+        context.project.id,
         query_params.search,
         query_params.categories,
     )
@@ -73,7 +73,7 @@ async def search_apps(
         True,
         True,
         None,  # app_names
-        context.org_id,
+        context.project.id,
         query_params.search,
         query_params.categories,
         query_params.limit,
@@ -90,7 +90,7 @@ async def search_apps(
 
 @router.get("/categories", response_model_exclude_none=True)
 async def get_all_categories(
-        context: Annotated[OrgContext, Depends(get_org_context)],
+        context: Annotated[RequestContext, Depends(get_request_context)],
 ) -> list[str]:
     """
     Get all unique categories from available apps.
@@ -99,14 +99,14 @@ async def get_all_categories(
         context.db_session,
         True,
         True,
-        context.org_id,
+        context.project.id,
     )
     return categories
 
 
 @router.get("/{app_name}", response_model_exclude_none=True)
 async def get_app_details(
-        context: Annotated[OrgContext, Depends(get_org_context)],
+        context: Annotated[RequestContext, Depends(get_request_context)],
         app_name: str,
 ) -> AppDetails:
     """
@@ -117,11 +117,11 @@ async def get_app_details(
         app_name,
         True,
         True,
-        context.org_id,
+        context.project.id,
     )
 
     if not app:
-        logger.error(f"App not found, app_name={app_name}, org_id={context.org_id}")
+        logger.error(f"App not found, app_name={app_name}, project_id={context.project.id}")
         raise AppNotFound(f"App={app_name} not found")
 
     return to_app_details(app)
@@ -129,7 +129,7 @@ async def get_app_details(
 
 @router.get("/{app_name}/functions", response_model_exclude_none=True)
 async def get_app_functions(
-        context: Annotated[OrgContext, Depends(get_org_context)],
+        context: Annotated[RequestContext, Depends(get_request_context)],
         app_name: str,
 ) -> list[BasicFunctionDefinition] | list[FunctionDetails]:
     """
@@ -140,11 +140,11 @@ async def get_app_functions(
         app_name,
         True,
         True,
-        context.org_id,
+        context.project.id,
     )
 
     if not app:
-        logger.error(f"App not found, app_name={app_name}, org_id={context.org_id}")
+        logger.error(f"App not found, app_name={app_name}, project_id={context.project.id}")
         raise AppNotFound(f"App={app_name} not found")
 
     app_functions = [

@@ -28,7 +28,7 @@ from aci.common.schemas.subscription import (
 )
 from aci.server import acl, billing, config
 from aci.server import dependencies as deps
-from aci.server.dependencies import OrgContext, get_org_context
+from aci.server.dependencies import RequestContext, get_request_context
 
 router = APIRouter()
 logger = get_logger(__name__)
@@ -38,15 +38,15 @@ auth = acl.get_propelauth()
 
 @router.get("/get-subscription", response_model=SubscriptionPublic)
 async def get_subscription(
-        context: Annotated[OrgContext, Depends(get_org_context)],
+        context: Annotated[RequestContext, Depends(get_request_context)],
 ) -> SubscriptionPublic:
-    acl.require_org_member(context.user, context.org_id)
+    acl.require_org_member(context.user, context.project.org_id)
 
-    active_subscription = crud.subscriptions.get_subscription_by_org_id(context.db_session, context.org_id)
+    active_subscription = crud.subscriptions.get_subscription_by_org_id(context.db_session, context.project.org_id)
     if not active_subscription:
         logger.info(
             "no active subscription found, the org is on the free plan",
-            extra={"org_id": context.org_id},
+            extra={"org_id": context.project.org_id},
         )
         return SubscriptionPublic(
             plan="free",
@@ -68,22 +68,22 @@ async def get_subscription(
 
 @router.get("/quota-usage", response_model=QuotaUsageResponse)
 async def get_quota_usage(
-        context: Annotated[OrgContext, Depends(get_org_context)],
+        context: Annotated[RequestContext, Depends(get_request_context)],
 ) -> QuotaUsageResponse:
-    acl.require_org_member(context.user, context.org_id)
+    acl.require_org_member(context.user, context.project.org_id)
 
-    active_plan = billing.get_active_plan_by_org_id(context.db_session, context.org_id)
-    logger.info(f"Getting quota usage, org_id={context.org_id}, plan={active_plan.name}")
+    active_plan = billing.get_active_plan_by_org_id(context.db_session, context.project.org_id)
+    logger.info(f"Getting quota usage, org_id={context.project.org_id}, plan={active_plan.name}")
 
-    projects_used = len(crud.projects.get_projects_by_org(context.db_session, context.org_id))
+    projects_used = len(crud.projects.get_projects_by_org(context.db_session, context.project.org_id))
     agent_credentials_used = crud.secret.get_total_number_of_agent_secrets_for_org(
-        context.db_session, context.org_id
+        context.db_session, context.project.org_id
     )
     linked_accounts_used = crud.linked_accounts.get_total_number_of_unique_linked_account_owner_ids(
-        context.db_session, context.org_id
+        context.db_session, context.project.org_id
     )
     total_monthly_api_calls_used_of_org = crud.projects.get_total_monthly_quota_usage_for_org(
-        context.db_session, context.org_id
+        context.db_session, context.project.org_id
     )
 
     return QuotaUsageResponse(
@@ -97,10 +97,10 @@ async def get_quota_usage(
 
 @router.post("/create-checkout-session")
 async def create_checkout_session(
-        context: Annotated[OrgContext, Depends(get_org_context)],
+        context: Annotated[RequestContext, Depends(get_request_context)],
         body: Annotated[StripeCheckoutSessionCreate, Body()],
 ) -> str:
-    acl.require_org_member_with_minimum_role(context.user, context.org_id, OrganizationRole.ADMIN)
+    acl.require_org_member_with_minimum_role(context.user, context.project.org_id, OrganizationRole.ADMIN)
 
     plan = crud.plans.get_by_name(context.db_session, body.plan_name)
     if not plan:
@@ -124,12 +124,12 @@ async def create_checkout_session(
             success_url=f"{config.DEV_PORTAL_URL}/settings",
             cancel_url=f"{config.DEV_PORTAL_URL}/pricing",
             mode="subscription",
-            client_reference_id=str(context.org_id),
+            client_reference_id=str(context.project.org_id),
             ui_mode="hosted",
             billing_address_collection="required",
             customer_email=context.user.email,
             metadata=StripeSubscriptionMetadata(
-                org_id=context.org_id,
+                org_id=context.project.org_id,
                 checkout_user_id=context.user.user_id,
                 checkout_user_email=context.user.email,
             ).model_dump(),
@@ -147,13 +147,13 @@ async def create_checkout_session(
 
 @router.post("/create-customer-portal-session")
 async def create_customer_portal_session(
-        context: Annotated[OrgContext, Depends(get_org_context)],
+        context: Annotated[RequestContext, Depends(get_request_context)],
 ) -> str:
-    acl.require_org_member_with_minimum_role(context.user, context.org_id, OrganizationRole.ADMIN)
+    acl.require_org_member_with_minimum_role(context.user, context.project.org_id, OrganizationRole.ADMIN)
 
-    active_subscription = crud.subscriptions.get_subscription_by_org_id(context.db_session, context.org_id)
+    active_subscription = crud.subscriptions.get_subscription_by_org_id(context.db_session, context.project.org_id)
     if not active_subscription:
-        logger.error(f"Subscription not found, the org is on the free plan, org_id={context.org_id}")
+        logger.error(f"Subscription not found, the org is on the free plan, org_id={context.project.org_id}")
         raise BillingError(
             "Subscription not found, the org is on the free plan",
             error_code=status.HTTP_404_NOT_FOUND,

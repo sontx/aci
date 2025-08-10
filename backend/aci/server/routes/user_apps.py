@@ -15,7 +15,7 @@ from aci.common.schemas.common import Paged
 from aci.common.schemas.function import BasicFunctionDefinition, FunctionDetails, FunctionUpsert
 from aci.common.schemas.security_scheme import SecuritySchemesPublic
 from aci.server import acl
-from aci.server.dependencies import OrgContext, get_org_context
+from aci.server.dependencies import RequestContext, get_request_context
 from aci.server.utils import format_function_definition
 
 logger = get_logger(__name__)
@@ -26,7 +26,7 @@ auth = acl.get_propelauth()
 @router.post("", response_model_exclude_none=True, status_code=status.HTTP_201_CREATED)
 async def create_user_app(
         app_upsert: AppUpsert,
-        context: Annotated[OrgContext, Depends(get_org_context)],
+        context: Annotated[RequestContext, Depends(get_request_context)],
 ) -> AppDetails:
     """
     Create a new user app for the organization.
@@ -36,7 +36,7 @@ async def create_user_app(
         app = crud.apps.create_user_app(
             context.db_session,
             app_upsert,
-            context.org_id,
+            context.project.id,
         )
         context.db_session.commit()
         return to_app_details(app)
@@ -46,7 +46,7 @@ async def create_user_app(
 
 @router.get("", response_model_exclude_none=True)
 async def list_user_apps(
-        context: Annotated[OrgContext, Depends(get_org_context)],
+        context: Annotated[RequestContext, Depends(get_request_context)],
         search: str | None = Query(None, description="Search in app name, display name, or description"),
         categories: list[str] | None = Query(None, description="Filter by categories"),
         limit: int | None = Query(None, ge=1, le=100, description="Limit number of results"),
@@ -57,7 +57,7 @@ async def list_user_apps(
     """
     apps = crud.apps.get_user_apps(
         context.db_session,
-        context.org_id,
+        context.project.id,
         True,  # active_only
         search,
         categories,
@@ -75,7 +75,7 @@ async def list_user_apps(
 
 @router.get("/search", response_model_exclude_none=True)
 async def search_user_apps(
-        context: Annotated[OrgContext, Depends(get_org_context)],
+        context: Annotated[RequestContext, Depends(get_request_context)],
         search: str | None = Query(None, description="Search in app name, display name, or description"),
         categories: list[str] | None = Query(None, description="Filter by categories"),
         limit: int | None = Query(20, ge=1, le=100, description="Limit number of results"),
@@ -87,7 +87,7 @@ async def search_user_apps(
     # Get total count for pagination
     total = crud.apps.count_user_apps(
         context.db_session,
-        context.org_id,
+        context.project.id,
         False,  # User can search inactive apps
         search,
         categories,
@@ -96,7 +96,7 @@ async def search_user_apps(
     # Get filtered apps
     apps = crud.apps.get_user_apps(
         context.db_session,
-        context.org_id,
+        context.project.id,
         False,
         search,
         categories,
@@ -114,7 +114,7 @@ async def search_user_apps(
 
 @router.get("/{app_name}", response_model_exclude_none=True)
 async def get_user_app_details(
-        context: Annotated[OrgContext, Depends(get_org_context)],
+        context: Annotated[RequestContext, Depends(get_request_context)],
         app_name: str,
 ) -> UserAppDetails:
     """
@@ -123,11 +123,11 @@ async def get_user_app_details(
     app = crud.apps.get_user_app_by_name(
         context.db_session,
         app_name,
-        context.org_id,
+        context.project.id,
     )
 
     if not app:
-        logger.error(f"User app not found, app_name={app_name}, org_id={context.org_id}")
+        logger.error(f"User app not found, app_name={app_name}, project_id={context.project.id}")
         raise AppNotFound(f"App with name {app_name} not found")
 
     return UserAppDetails(
@@ -145,13 +145,13 @@ async def get_user_app_details(
         supported_security_schemes=SecuritySchemesPublic.model_validate(app.security_schemes),
         created_at=app.created_at,
         updated_at=app.updated_at,
-        org_id=app.org_id,
+        project_id=app.project_id,
     )
 
 
 @router.put("/{app_name}", response_model_exclude_none=True)
 async def update_user_app(
-        context: Annotated[OrgContext, Depends(get_org_context)],
+        context: Annotated[RequestContext, Depends(get_request_context)],
         app_name: str,
         app_upsert: AppUpsert,
 ) -> AppDetails:
@@ -164,7 +164,7 @@ async def update_user_app(
             context.db_session,
             app_name,
             app_upsert,
-            context.org_id,
+            context.project.id,
         )
         context.db_session.commit()
         return to_app_details(app)
@@ -174,7 +174,7 @@ async def update_user_app(
 
 @router.delete("/{app_name}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_user_app(
-        context: Annotated[OrgContext, Depends(get_org_context)],
+        context: Annotated[RequestContext, Depends(get_request_context)],
         app_name: str,
 ) -> None:
     """
@@ -184,7 +184,7 @@ async def delete_user_app(
         crud.apps.delete_user_app(
             context.db_session,
             app_name,
-            context.org_id,
+            context.project.id,
         )
         context.db_session.commit()
     except ConflictError as e:
@@ -193,17 +193,17 @@ async def delete_user_app(
 
 @router.get("/{app_name}/functions", response_model_exclude_none=True)
 async def get_user_app_functions(
-        context: Annotated[OrgContext, Depends(get_org_context)],
+        context: Annotated[RequestContext, Depends(get_request_context)],
         app_name: str,
 ) -> list[BasicFunctionDefinition] | list[FunctionDetails]:
     """
     Get all functions of a user app by name.
     """
-    # Use the new CRUD method that properly filters by org_id
+    # Use the new CRUD method that properly filters by project ID
     app_functions_raw = crud.functions.get_user_functions_by_app_name(
         context.db_session,
         app_name,
-        context.org_id,
+        context.project.id,
     )
 
     app_functions = [
@@ -216,7 +216,7 @@ async def get_user_app_functions(
 
 @router.post("/{app_name}/functions", response_model_exclude_none=True, status_code=status.HTTP_201_CREATED)
 async def create_user_app_functions(
-        context: Annotated[OrgContext, Depends(get_org_context)],
+        context: Annotated[RequestContext, Depends(get_request_context)],
         app_name: str,
         functions_upsert: list[FunctionUpsert],
         override_existing: bool = Query(False, description="Override existing functions with the same name"),
@@ -241,7 +241,7 @@ async def create_user_app_functions(
             functions_upsert,
             override_existing,
             remove_previous,
-            context.org_id,
+            context.project.id,
         )
         context.db_session.commit()
         return [format_function_definition(function, format=FunctionDefinitionFormat.BASIC) for function in functions]

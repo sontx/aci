@@ -198,7 +198,7 @@ class Function(Base):
         nullable=False,
         init=False,
     )
-    org_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), nullable=True, index=True, default=None)
+    project_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), nullable=True, index=True, default=None)
 
     # the App that this function belongs to
     app: Mapped[App] = relationship("App", lazy="select", back_populates="functions", init=False)
@@ -210,8 +210,8 @@ class Function(Base):
     # unique constraint: name is unique within an app
     __table_args__ = (
         Index(
-            "uq_function_orgid_name",
-            func.coalesce(func.cast(org_id, String), text("'null_org'")),
+            "uq_function_project_id_name",
+            func.coalesce(func.cast(project_id, String), text("'null_project'")),
             name,
             unique=True,
             postgresql_using="btree"
@@ -225,7 +225,7 @@ class App(Base):
     id: Mapped[UUID] = mapped_column(
         PGUUID(as_uuid=True), primary_key=True, default_factory=uuid4, init=False
     )
-    # Need name within org to be unique to support globally unique function name.
+    # Need name within project to be unique to support globally unique function name.
     name: Mapped[str] = mapped_column(String(APP_NAME_MAX_LENGTH), nullable=False, index=True)
     display_name: Mapped[str] = mapped_column(String(MAX_STRING_LENGTH), nullable=False)
     # provider (or company) of the app, e.g., google, github, or ACI or user (if allow user to create custom apps)
@@ -259,7 +259,7 @@ class App(Base):
         nullable=False,
         init=False,
     )
-    org_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), nullable=True, index=True, default=None)
+    project_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), nullable=True, index=True, default=None)
 
     # deleting app will delete all functions under the app
     functions: Mapped[list[Function]] = relationship(
@@ -270,11 +270,11 @@ class App(Base):
         init=False,
     )
 
-    # unique constraint: name is unique within an org
+    # unique constraint: name is unique within a project
     __table_args__ = (
         Index(
-            "uq_app_orgid_name",
-            func.coalesce(func.cast(org_id, String), text("'null_org'")),
+            "uq_app_project_id_name",
+            func.coalesce(func.cast(project_id, String), text("'null_project'")),
             name,
             unique=True,
             postgresql_using="btree",

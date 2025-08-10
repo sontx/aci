@@ -139,7 +139,7 @@ async def get_function_definition(
         function = crud.functions.get_user_function_by_name(
             context.db_session,
             function_name,
-            org_id=context.org_id,
+            project_id=context.project.id,
         )
 
         if not function:
@@ -182,7 +182,7 @@ async def execute(
         function_name=function_name,
         function_input=body.function_input,
         linked_account_owner_id=body.linked_account_owner_id,
-        org_id=context.org_id,
+        project_id=context.project.id,
     )
 
     end_time = datetime.now(UTC)
@@ -231,7 +231,7 @@ async def execute_function(
     function_name: str,
     function_input: dict,
     linked_account_owner_id: str,
-    org_id: str | None = None,
+    project_id: UUID | None = None,
 ) -> FunctionExecutionResult:
     """
     Execute a function with the given parameters.
@@ -265,7 +265,7 @@ async def execute_function(
         function = crud.functions.get_user_function_by_name(
             db_session,
             function_name,
-            org_id=UUID(org_id),
+            project_id=project_id,
         )
 
         if not function:

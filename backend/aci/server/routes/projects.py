@@ -12,7 +12,7 @@ from aci.common.exceptions import (
 from aci.common.logging_setup import get_logger
 from aci.common.schemas.project import ProjectCreate, ProjectPublic, ProjectUpdate
 from aci.server import acl, quota_manager
-from aci.server.dependencies import OrgContext, get_org_context
+from aci.server.dependencies import RequestContext, get_request_context
 
 # Create router instance
 router = APIRouter()
@@ -25,7 +25,7 @@ auth = acl.get_propelauth()
 @router.post("", response_model=ProjectPublic, include_in_schema=True)
 async def create_project(
         body: ProjectCreate,
-        context: Annotated[OrgContext, Depends(get_org_context)],
+        context: Annotated[RequestContext, Depends(get_request_context)],
 ) -> Project:
     logger.info(f"Create project, user_id={context.user.user_id}, org_id={body.org_id}")
 
@@ -44,16 +44,16 @@ async def create_project(
 
 @router.get("", response_model=list[ProjectPublic], include_in_schema=True)
 async def get_projects(
-        context: Annotated[OrgContext, Depends(get_org_context)],
+        context: Annotated[RequestContext, Depends(get_request_context)],
 ) -> list[Project]:
     """
     Get all projects for the organization if the user is a member of the organization.
     """
-    acl.validate_user_access_to_org(context.user, context.org_id)
+    acl.validate_user_access_to_org(context.user, context.project.org_id)
 
-    logger.info(f"Get projects, user_id={context.user.user_id}, org_id={context.org_id}")
+    logger.info(f"Get projects, user_id={context.user.user_id}, org_id={context.project.org_id}")
 
-    projects = crud.projects.get_projects_by_org(context.db_session, context.org_id)
+    projects = crud.projects.get_projects_by_org(context.db_session, context.project.org_id)
 
     return projects
 
@@ -61,7 +61,7 @@ async def get_projects(
 @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT, include_in_schema=True)
 async def delete_project(
         project_id: UUID,
-        context: Annotated[OrgContext, Depends(get_org_context)],
+        context: Annotated[RequestContext, Depends(get_request_context)],
 ) -> None:
     """
     Delete a project by project id.
@@ -99,7 +99,7 @@ async def delete_project(
 async def update_project(
         project_id: UUID,
         body: ProjectUpdate,
-        context: Annotated[OrgContext, Depends(get_org_context)],
+        context: Annotated[RequestContext, Depends(get_request_context)],
 ) -> Project:
     """
     Update a project by project id.

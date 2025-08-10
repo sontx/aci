@@ -49,24 +49,13 @@ def extract_org_id(user: User, prefer_org_id: str):
         if first_org:
             org_id = first_org.org_id
 
-    return org_id
+    return UUID(org_id)
 
 
-class OrgContext:
-    def __init__(self, user: User, prefer_org_id: str, project_id: str, db_session: Session):
+class RequestContext:
+    def __init__(self, user: User, project: Project, db_session: Session):
         self.user = user
         self.db_session = db_session
-        self.project_id = UUID(project_id)
-
-        self.org_id = extract_org_id(user, prefer_org_id)
-        if not self.org_id:
-            # Raise an error if no org is found
-            raise ValueError("User does not belong to any organization.")
-
-
-class RequestContext(OrgContext):
-    def __init__(self, user: User, prefer_org_id: str, project: Project, db_session: Session):
-        super().__init__(user, prefer_org_id, str(project.id), db_session)
         self.project = project
 
 
@@ -194,30 +183,35 @@ def validate_monthly_api_quota(
 def get_request_context(
         user: Annotated[User, Depends(auth.require_user)],
         db_session: Annotated[Session, Depends(yield_db_session)],
-        prefer_org_id: str = Depends(get_header(ACI_ORG_ID_HEADER)),
-        project_id: str = Depends(get_header(ACI_PROJECT_ID_HEADER)),
+        prefer_org_id: UUID = Depends(get_header(ACI_ORG_ID_HEADER)),
+        project_id: UUID = Depends(get_header(ACI_PROJECT_ID_HEADER)),
 ) -> RequestContext:
     """
     Returns a RequestContext object containing the DB session,
     the validated API key ID, and the project ID.
     """
-    project = crud.projects.get_project(db_session, UUID(project_id))
-    logger.info(
-        f"Populating request context project_id={project.id}"
-    )
+    project = crud.projects.get_project(db_session, project_id)
+    if not project:
+        logger.error(f"Project not found, project_id={project_id}")
+        raise ProjectNotFound(f"Project not found, project_id={project_id}")
+
+    org_id = extract_org_id(user, str(prefer_org_id) if prefer_org_id else project.org_id)
+    if not org_id:
+        logger.error("No valid organization found for the user")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No valid organization found for the user",
+        )
+
+    if project.org_id != org_id:
+        logger.error(f"Project {project.id} does not belong to organization {org_id}")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Project {project.id} does not belong to organization {org_id}",
+        )
 
     return RequestContext(
         db_session=db_session,
         project=project,
-        prefer_org_id=prefer_org_id,
         user=user,
     )
-
-
-def get_org_context(
-        user: Annotated[User, Depends(auth.require_user)],
-        db_session: Annotated[Session, Depends(yield_db_session)],
-        prefer_org_id: str = Depends(get_header(ACI_ORG_ID_HEADER)),
-        project_id: str = Depends(get_header(ACI_PROJECT_ID_HEADER)),
-) -> OrgContext:
-    return OrgContext(user, prefer_org_id, project_id, db_session)
