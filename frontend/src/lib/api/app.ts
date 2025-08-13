@@ -34,16 +34,6 @@ export async function getAllCategories(): Promise<string[]> {
   return response.data;
 }
 
-export async function getApps(appNames: string[]): Promise<App[]> {
-  const params = new URLSearchParams();
-  appNames.forEach((name) => {
-    params.append("app_names", name);
-  });
-
-  const response = await axiosInstance.get(`/v1/apps?${params.toString()}`);
-  return response.data;
-}
-
 export async function getApp(appName: string): Promise<App | null> {
   const response = await axiosInstance.get<App>(`/v1/apps/${appName}`);
   return response.data;

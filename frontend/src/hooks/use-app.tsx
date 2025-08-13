@@ -21,6 +21,7 @@ export function useApps(appNames?: string[]) {
   return useQuery({
     queryKey: appKeys.queryApps(appNames),
     queryFn: () => getAllApps(appNames),
+    enabled: !appNames || appNames.length > 0,
   });
 }
 
