@@ -364,6 +364,7 @@ Commands:
   create-project                 Create a project in db.
   create-random-api-key          Create a random test api key for local...
   delete-app                     Delete an app and all its references...
+  encryption-key                 Encryption key management commands
   fuzzy-test-function-execution  Test function execution with...
   get-app                        Get an app by name from the database.
   rename-app                     Rename an app and update all related...
@@ -371,6 +372,82 @@ Commands:
   upsert-app                     Insert or update an App in the DB from a...
   upsert-functions               Upsert functions in the DB from a JSON...
 ```
+
+### Encryption Key Management
+
+The CLI provides encryption key management commands for generating new keys and re-encrypting data.
+
+#### Using the CLI directly:
+
+Generate a new encryption key:
+
+```bash
+# Generate a new AES-256 key (default)
+docker compose exec runner python -m aci.cli encryption-key generate-key
+
+# Generate an AES-128 key
+docker compose exec runner python -m aci.cli encryption-key generate-key --key-size 16
+
+# Generate an AES-192 key
+docker compose exec runner python -m aci.cli encryption-key generate-key --key-size 24
+```
+
+Re-encrypt all data using the current encryption key:
+
+```bash
+# Re-encrypt all encrypted data to use the current encryption key
+docker compose exec runner python -m aci.cli encryption-key reencrypt-to-current
+
+# Use custom batch size and commit frequency for large databases
+docker compose exec runner python -m aci.cli encryption-key reencrypt-to-current --batch-size 100 --commit-every 500
+```
+
+This command will:
+- Find all encrypted data in the database (API keys, app security schemes, linked account credentials, and agent secrets)
+- Use cursor-based pagination for optimal performance on large datasets
+- Process records in configurable batches (default: 50 per batch)
+- Commit changes periodically to avoid long-running transactions (default: every 1000 records)
+- Display progress and statistics for each table processed
+- Automatically handle transaction timeouts for large operations
+
+**Performance Options:**
+- `--batch-size N`: Number of records to fetch and process in each batch (default: 50)
+- `--commit-every N`: Commit database changes every N records (default: 1000)
+
+**For Large Databases:**
+- Use larger batch sizes (100-500) for better throughput
+- Adjust commit frequency based on your database's transaction timeout settings
+- The command uses cursor-based pagination instead of OFFSET for better performance on large tables
+```
+
+#### Using the convenience script:
+
+The `encryption-key.sh` script provides a more user-friendly interface with additional output formats:
+
+Generate encryption keys:
+
+```bash
+# Generate with default settings (AES-256, console output)
+docker compose exec runner ./scripts/encryption-key.sh
+
+# Generate AES-128 key in JSON format
+docker compose exec runner ./scripts/encryption-key.sh generate --key-size 16 --output json
+
+# Generate key in environment variable format
+docker compose exec runner ./scripts/encryption-key.sh generate --output env
+```
+
+Re-encrypt all data to current key:
+
+```bash
+# Re-encrypt all encrypted data using the current key
+docker compose exec runner ./scripts/encryption-key.sh reencrypt-to-current
+```
+
+The script supports the following output formats for key generation:
+- `console`: Human-readable output (default)
+- `json`: JSON format for programmatic use
+- `env`: Environment variable format for shell scripts
 
 To create a new app, run:
 

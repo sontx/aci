@@ -4,6 +4,7 @@ from aci.cli.commands import (
     billing,
     create_project,
     delete_app,
+    encryption_key,
     get_app,
     rename_app,
     upsert_app,
@@ -26,6 +27,7 @@ cli.add_command(rename_app.rename_app)
 cli.add_command(delete_app.delete_app)
 cli.add_command(upsert_functions.upsert_functions)
 cli.add_command(billing.populate_subscription_plans)
+cli.add_command(encryption_key.encryption_key)
 
 if __name__ == "__main__":
     cli()

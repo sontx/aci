@@ -1,3 +1,4 @@
+import json
 import os
 import re
 from functools import cache
@@ -11,12 +12,19 @@ from aci.common.logging_setup import get_logger
 logger = get_logger(__name__)
 
 
-def check_and_get_env_variable(name: str) -> str:
+def check_and_get_env_variable(name: str, decode_json=False) -> str:
     value = os.getenv(name)
     if value is None:
         raise ValueError(f"Environment variable '{name}' is not set")
     if value == "":
         raise ValueError(f"Environment variable '{name}' is empty string")
+
+    if decode_json:
+        try:
+            value = json.loads(value)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Environment variable '{name}' is not valid JSON: {e}")
+
     return value
 
 
