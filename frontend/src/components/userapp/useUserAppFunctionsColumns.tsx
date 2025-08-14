@@ -80,6 +80,18 @@ export const useUserAppFunctionsColumns = (): ColumnDef<AppFunction>[] => {
         enableColumnFilter: true,
       }),
 
+      columnHelper.accessor("active", {
+        header: "Active",
+        cell: (info) => (
+          <Badge
+            variant={info.getValue() ? "default" : "destructive"}
+            className="text-nowrap"
+          >
+            {info.getValue() ? "Yes" : "No"}
+          </Badge>
+        ),
+      }),
+
       columnHelper.accessor((row) => row, {
         id: "actions",
         header: () => null,
