@@ -11,6 +11,7 @@ export interface AppFunction {
   response?: string;
   protocol: "rest" | "connector" | "graphql" | "websocket" | "grpc";
   protocol_data: RestMetadata;
+  active: boolean;
 }
 
 export interface FunctionExecute {
@@ -61,4 +62,11 @@ export interface FunctionUpsert {
   protocol_data: RestMetadata;
   parameters: Record<string, any>;
   response: Record<string, any>;
+}
+
+export interface FunctionUpdate {
+  description?: string;
+  tags?: string[];
+  visibility?: Visibility;
+  active?: boolean;
 }

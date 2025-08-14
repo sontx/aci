@@ -4,6 +4,9 @@ import React from "react";
 import { useParams } from "next/navigation";
 import { FunctionDetailContent } from "@/components/apps/function-detail-content";
 import { useAppFunction } from "@/hooks/use-app-functions";
+import { RunFunctionDialog } from "@/components/userapp/run-function-form";
+import { Button } from "@/components/ui/button";
+import { Play } from "lucide-react";
 
 const FunctionDetailPage = () => {
   const { functionName } = useParams<{
@@ -30,7 +33,17 @@ const FunctionDetailPage = () => {
   return (
     <div className="m-4">
       <div className="max-w-6xl">
-        <FunctionDetailContent func={func} />
+        <FunctionDetailContent
+          func={func}
+          actions={
+            <RunFunctionDialog functionName={func.name} appName={func.app_name}>
+              <Button>
+                <Play className="h-4 w-4" />
+                Run Function
+              </Button>
+            </RunFunctionDialog>
+          }
+        />
       </div>
     </div>
   );

@@ -9,7 +9,7 @@ from aci.common.db.sql_models import App, Function
 from aci.common.enums import Visibility
 from aci.common.exceptions import FunctionNotFound, ConflictError, AppNotFound
 from aci.common.logging_setup import get_logger
-from aci.common.schemas.function import FunctionUpsert
+from aci.common.schemas.function import FunctionUpsert, FunctionUpdate
 
 logger = get_logger(__name__)
 
@@ -221,7 +221,8 @@ def create_user_functions(
     """
     Create user functions for a specific organization.
     """
-    logger.debug(f"Creating user functions for app name {app_name}, project_id={project_id}, override_existing={override_existing}, remove_previous={remove_previous}")
+    logger.debug(
+        f"Creating user functions for app name {app_name}, project_id={project_id}, override_existing={override_existing}, remove_previous={remove_previous}")
 
     app = crud.apps.get_user_app_by_name(db_session, app_name, project_id)
     if not app:
@@ -277,25 +278,47 @@ def create_user_functions(
     return functions
 
 
-def update_user_functions(
+def update_user_function(
         db_session: Session,
-        function_upsert: FunctionUpsert,
+        function_name: str,
+        function_update: FunctionUpdate,
         project_id: UUID,
 ) -> Function:
     """
     Update user functions for a specific organization.
     """
-    logger.debug(f"Updating user function, functions_upsert={function_upsert.name}, project_id={project_id}")
+    logger.debug(f"Updating user function, function_update={function_name}, project_id={project_id}")
 
-    function = get_user_function_by_name(db_session, function_upsert.name, project_id)
+    function = get_user_function_by_name(db_session, function_name, project_id)
     if not function:
-        logger.error(f"User function={function_upsert.name} does not exist for project_id={project_id}")
-        raise FunctionNotFound(f"User function={function_upsert.name} does not exist on your organization")
+        logger.error(f"User function={function_name} does not exist for project_id={project_id}")
+        raise FunctionNotFound(f"User function={function_name} does not exist on your organization")
 
-    function_data = function_upsert.model_dump(mode="json", exclude_unset=True)
+    function_data = function_update.model_dump(mode="json", exclude_unset=True)
     for field, value in function_data.items():
         setattr(function, field, value)
 
     db_session.flush()
 
     return function
+
+
+def get_user_function_tags(
+        db_session: Session,
+        project_id: UUID,
+) -> list[str]:
+    """
+    Get all tags used in user functions for the current project functions and global functions.
+    """
+    statement = select(Function).filter(
+        (Function.project_id == project_id) | (Function.project_id.is_(None))
+    ).distinct(Function.tags)
+
+    functions = db_session.execute(statement).scalars().all()
+    tags = set()
+
+    for function in functions:
+        if function.tags:
+            tags.update(function.tags)
+
+    return list(tags)

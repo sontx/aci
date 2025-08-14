@@ -38,7 +38,7 @@ function generateAppNameFromDisplayName(displayName: string): string {
     .replace(/^_|_$/g, '');
 
   // Convert to uppercase and add ORG_ prefix
-  return `ORG_${snakeCase.toUpperCase()}`;
+  return snakeCase.toUpperCase();
 }
 
 export function UserAppFormContent({

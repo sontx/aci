@@ -14,7 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { FunctionExecutionResult } from "@/lib/types/appfunction";
@@ -151,10 +151,11 @@ function RunFunctionFormContent({
 
   if (!linkedAccounts || linkedAccounts.length === 0) {
     return (
-      <Alert>
-        <AlertDescription>
-          No linked accounts found for app &quot;{appName}&quot;. Please create
-          a linked account first.
+      <Alert className="my-4">
+        <AlertTitle>No Linked Accounts Available</AlertTitle>
+        <AlertDescription className="text-muted-foreground">
+          No linked accounts found for app <strong>{appName}</strong>. Please
+          create a linked account first.
         </AlertDescription>
       </Alert>
     );
@@ -318,10 +319,7 @@ export function RunFunctionDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent
-        className="sm:max-w-[600px]"
-        preventCloseOnClickOutside
-      >
+      <DialogContent className="sm:max-w-[600px]" preventCloseOnClickOutside>
         {open && (
           <RunFunctionFormContent
             functionName={functionName}

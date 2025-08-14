@@ -1,31 +1,31 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import { Button } from "@/components/ui/button"
+import * as React from "react";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { MoreHorizontal } from "lucide-react"
-import { cn } from "@/lib/utils"
+} from "@/components/ui/dropdown-menu";
+import { MoreHorizontal } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export interface SecondaryAction {
-  label: string
-  onClick: () => void
-  disabled?: boolean
-  destructive?: boolean
-  icon?: React.ReactNode
-  description?: string
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  destructive?: boolean;
+  icon?: React.ReactNode;
+  description?: string;
 }
 
 export interface MoreButtonProps {
-  primaryActionComponent: React.ReactNode
-  secondaryActions?: SecondaryAction[]
-  className?: string
-  dropdownAlign?: "start" | "center" | "end"
-  dropdownSide?: "top" | "right" | "bottom" | "left"
+  primaryActionComponent: React.ReactNode;
+  secondaryActions?: SecondaryAction[];
+  className?: string;
+  dropdownAlign?: "start" | "center" | "end";
+  dropdownSide?: "top" | "right" | "bottom" | "left";
 }
 
 export function MoreButton({
@@ -36,46 +36,52 @@ export function MoreButton({
   dropdownSide = "bottom",
 }: MoreButtonProps) {
   if (secondaryActions.length === 0) {
-    return <div className={cn("flex", className)}>{primaryActionComponent}</div>
+    return (
+      <div className={cn("flex", className)}>{primaryActionComponent}</div>
+    );
   }
 
   return (
     <div className={cn("flex items-center", className)}>
       <div className="flex rounded-md shadow-sm">
         {/* Primary Action Button */}
-        <div className="relative inline-flex">
-          {primaryActionComponent}
-        </div>
+        <div className="relative inline-flex">{primaryActionComponent}</div>
 
         {/* Dropdown Menu for Secondary Actions */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
               size="icon"
-              className="rounded-l-none border-l-gray-500 border-l h-9 w-9 shadow-sm"
+              className="rounded-l-none border-l-gray-600 border-l h-9 w-9 shadow-sm"
               aria-label="More actions"
             >
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent 
-            align={dropdownAlign} 
-            side={dropdownSide}
-          >
+          <DropdownMenuContent align={dropdownAlign} side={dropdownSide}>
             {secondaryActions.map((action, index) => (
               <DropdownMenuItem
                 key={index}
-                onClick={action.onClick}
+                onClick={() => {
+                  if (!action.disabled) {
+                    setTimeout(() => {
+                      action.onClick();
+                    });
+                  }
+                }}
                 disabled={action.disabled}
                 className={cn(
                   "cursor-pointer",
                   action.description ? "py-2" : "py-1.5",
-                  action.destructive && "text-destructive focus:text-destructive"
+                  action.destructive &&
+                    "text-destructive focus:text-destructive",
                 )}
               >
                 <div className="flex items-start w-full">
                   {action.icon && (
-                    <span className="mr-2 h-4 w-4 mt-0.5 flex-shrink-0">{action.icon}</span>
+                    <span className="mr-2 h-4 w-4 mt-0.5 flex-shrink-0">
+                      {action.icon}
+                    </span>
                   )}
                   <div className="flex flex-col">
                     <span className="text-sm font-medium">{action.label}</span>
@@ -92,5 +98,5 @@ export function MoreButton({
         </DropdownMenu>
       </div>
     </div>
-  )
+  );
 }

@@ -6,7 +6,11 @@ import {
   UserAppUpsert,
 } from "@/lib/types/userapp";
 import axiosInstance from "@/lib/axios";
-import { AppFunction, FunctionUpsert } from "@/lib/types/appfunction";
+import {
+  AppFunction,
+  FunctionUpdate,
+  FunctionUpsert,
+} from "@/lib/types/appfunction";
 
 export async function getAllUserApps(
   params?: UserAppSearchParams,
@@ -87,4 +91,16 @@ export async function createUserAppFunctions(
 
 export async function deleteUserAppFunction(name: string): Promise<void> {
   await axiosInstance.delete(`/v1/user-functions/${name}`);
+}
+
+export async function updateUserAppFunction(
+  functionName: string,
+  data: FunctionUpdate,
+): Promise<void> {
+  await axiosInstance.put(`/v1/user-functions/${functionName}`, data);
+}
+
+export async function getAllFunctionTags(): Promise<string[]> {
+  const response = await axiosInstance.get<string[]>("/v1/user-functions/tags");
+  return response.data;
 }

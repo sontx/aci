@@ -2,7 +2,7 @@
 import * as React from "react";
 import { type AppFunction, RestMetadata } from "@/lib/types/appfunction";
 import { Badge } from "@/components/ui/badge";
-import { Hammer, Play } from "lucide-react";
+import { Hammer } from "lucide-react";
 import { MarkdownViewer } from "@/components/ui-extensions/markdown-viewer";
 import {
   Card,
@@ -11,11 +11,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { RunFunctionDialog } from "@/components/userapp/run-function-form";
 
 interface FunctionDetailContentProps {
   func: AppFunction;
+  actions?: React.ReactNode;
 }
 
 function RestProtocolViewer({ metadata }: { metadata: RestMetadata }) {
@@ -67,7 +66,10 @@ function RestProtocolViewer({ metadata }: { metadata: RestMetadata }) {
   );
 }
 
-export function FunctionDetailContent({ func }: FunctionDetailContentProps) {
+export function FunctionDetailContent({
+  func,
+  actions,
+}: FunctionDetailContentProps) {
   return (
     <div className="grid gap-6">
       <div className="flex items-center justify-between">
@@ -85,6 +87,9 @@ export function FunctionDetailContent({ func }: FunctionDetailContentProps) {
                       {tag}
                     </Badge>
                   ))}
+                  {!func.active && (
+                    <Badge variant="destructive">Disabled</Badge>
+                  )}
                 </div>
               )}
             </div>
@@ -95,12 +100,7 @@ export function FunctionDetailContent({ func }: FunctionDetailContentProps) {
             </div>
           )}
         </div>
-        <RunFunctionDialog functionName={func.name} appName={func.app_name}>
-          <Button>
-            <Play className="h-4 w-4" />
-            Run Function
-          </Button>
-        </RunFunctionDialog>
+        {actions}
       </div>
 
       {func.protocol === "rest" && (

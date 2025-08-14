@@ -6,11 +6,13 @@ import {
   createUserAppFunctions,
   deleteUserApp,
   deleteUserAppFunction,
+  getAllFunctionTags,
   getUserApp,
   getUserAppFunction,
   getUserAppFunctions,
   searchUserApps,
   updateUserApp,
+  updateUserAppFunction,
 } from "@/lib/api/userapp";
 import { useMetaInfo } from "@/components/context/metainfo";
 import {
@@ -21,7 +23,11 @@ import {
   UserAppUpsert,
 } from "@/lib/types/userapp";
 import { toast } from "sonner";
-import { AppFunction, FunctionUpsert } from "@/lib/types/appfunction";
+import {
+  AppFunction,
+  FunctionUpdate,
+  FunctionUpsert,
+} from "@/lib/types/appfunction";
 
 export const userAppKeys = {
   all: (projectId: string) => [projectId, "userapps"] as const,
@@ -33,6 +39,8 @@ export const userAppKeys = {
     [projectId, "userapps", appName, "functions"] as const,
   functionDetail: (projectId: string, appName: string, functionName: string) =>
     [projectId, "userapps", appName, "functions", functionName] as const,
+  functionTags: (projectId: string) =>
+    [projectId, "userapps", "function-tags"] as const,
 };
 
 export const useSearchUserApps = (params?: UserAppSearchParams) => {
@@ -236,5 +244,42 @@ export function useDeleteUserAppFunction(
       console.error("Delete user app function failed:", error);
       toast.error("Failed to delete user app function");
     },
+  });
+}
+
+export function useUpdateUserAppFunction(
+  appName: string,
+  functionName: string,
+) {
+  const queryClient = useQueryClient();
+  const { activeProject } = useMetaInfo();
+
+  return useMutation<void, Error, FunctionUpdate>({
+    mutationFn: (functionData) => {
+      return updateUserAppFunction(functionName, functionData);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: userAppKeys.functionDetail(
+          activeProject.id,
+          appName,
+          functionName,
+        ),
+      });
+      toast.success("Function updated successfully");
+    },
+    onError: (error) => {
+      console.error("Update user app function failed:", error);
+      toast.error("Failed to update user app function");
+    },
+  });
+}
+
+export function useGetAllFunctionTags() {
+  const { activeProject } = useMetaInfo();
+
+  return useQuery<string[], Error>({
+    queryKey: userAppKeys.functionTags(activeProject.id),
+    queryFn: () => getAllFunctionTags(),
   });
 }

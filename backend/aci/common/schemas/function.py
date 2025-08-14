@@ -29,6 +29,21 @@ class ConnectorMetadata(RootModel[dict]):
     """placeholder, allow any metadata for connector for now"""
 
 
+class FunctionUpdate(BaseModel):
+    description: str | None = Field(
+        default=None, max_length=MAX_STRING_LENGTH, description="The description of the function."
+    )
+    tags: list[str] | None = Field(
+        default=None, description="List of tags for the function."
+    )
+    visibility: Visibility | None = Field(
+        default=None, description="Visibility of the function."
+    )
+    active: bool | None = Field(
+        default=None, description="Whether the function is active or not."
+    )
+
+
 class FunctionUpsert(BaseModel):
     name: str
     description: str
@@ -81,6 +96,7 @@ class FunctionUpsert(BaseModel):
                 f"but got {type(self.protocol_data).__name__}"
             )
         return self
+
 
 class FunctionsList(BaseModel):
     app_names: list[str] | None = Field(
