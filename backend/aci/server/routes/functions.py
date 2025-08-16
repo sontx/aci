@@ -1,4 +1,6 @@
 import json
+import time
+import uuid
 from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID
@@ -8,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from aci.common.db import crud
 from aci.common.db.sql_models import Function, Project
-from aci.common.enums import FunctionDefinitionFormat, Visibility
+from aci.common.enums import FunctionDefinitionFormat, Visibility, ExecutionStatus
 from aci.common.exceptions import (
     AppConfigurationDisabled,
     AppConfigurationNotFound,
@@ -31,6 +33,8 @@ from aci.common.schemas.function import (
 from aci.server import config, utils
 from aci.server import dependencies as deps
 from aci.server import security_credentials_manager as scm
+from aci.server.context import request_id_ctx_var
+from aci.server.execution_logs.execution_log_appender import log_appender
 from aci.server.function_executors import get_executor
 from aci.server.security_credentials_manager import SecurityCredentialsResponse
 from aci.server.utils import format_function_definition
@@ -38,10 +42,11 @@ from aci.server.utils import format_function_definition
 router = APIRouter()
 logger = get_logger(__name__)
 
+
 @router.get("", response_model=list[FunctionDetails])
 async def list_functions(
-    context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
-    query_params: Annotated[FunctionsList, Query()],
+        context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
+        query_params: Annotated[FunctionsList, Query()],
 ) -> list[Function]:
     """Get a list of functions and their details. Sorted by function name."""
     return crud.functions.get_functions(
@@ -56,14 +61,14 @@ async def list_functions(
 
 @router.get("/search", response_model_exclude_none=True)
 async def search_functions(
-    context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
-    query_params: Annotated[FunctionsSearch, Query()],
+        context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
+        query_params: Annotated[FunctionsSearch, Query()],
 ) -> list[
     BasicFunctionDefinition
     | OpenAIFunctionDefinition
     | OpenAIResponsesFunctionDefinition
     | AnthropicFunctionDefinition
-]:
+    ]:
     """
     Returns the basic information of a list of functions.
     """
@@ -107,22 +112,23 @@ async def search_functions(
 # TODO: "flatten" flag to make sure nested parameters are flattened?
 @router.get(
     "/{function_name}/definition",
-    response_model_exclude_none=True,  # having this to exclude "strict" field in openai's function definition if not set
+    response_model_exclude_none=True,
+    # having this to exclude "strict" field in openai's function definition if not set
 )
 async def get_function_definition(
-    context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
-    function_name: str,
-    format: FunctionDefinitionFormat = Query(  # noqa: B008 # TODO: need to fix this later
-        default=FunctionDefinitionFormat.OPENAI,
-        description="The format to use for the function definition (e.g., 'openai' or 'anthropic'). "
-        "There is also a 'basic' format that only returns name and description.",
-    ),
+        context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
+        function_name: str,
+        format: FunctionDefinitionFormat = Query(  # noqa: B008 # TODO: need to fix this later
+            default=FunctionDefinitionFormat.OPENAI,
+            description="The format to use for the function definition (e.g., 'openai' or 'anthropic'). "
+                        "There is also a 'basic' format that only returns name and description.",
+        ),
 ) -> (
-    BasicFunctionDefinition
-    | OpenAIFunctionDefinition
-    | OpenAIResponsesFunctionDefinition
-    | AnthropicFunctionDefinition
-    | FunctionDetails
+        BasicFunctionDefinition
+        | OpenAIFunctionDefinition
+        | OpenAIResponsesFunctionDefinition
+        | AnthropicFunctionDefinition
+        | FunctionDetails
 ):
     """
     Return the function definition that can be used directly by LLM.
@@ -170,19 +176,41 @@ async def get_function_definition(
     response_model_exclude_none=True,
 )
 async def execute(
-    context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
-    function_name: str,
-    body: FunctionExecute,
+        context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
+        function_name: str,
+        body: FunctionExecute,
 ) -> FunctionExecutionResult:
     start_time = datetime.now(UTC)
 
-    result = await execute_function(
+    start = time.perf_counter()
+    created_at = datetime.now(UTC)
+
+    result, app_name, linked_account_owner_id, app_configuration_id = await execute_function(
         db_session=context.db_session,
         project=context.project,
         function_name=function_name,
         function_input=body.function_input,
         linked_account_owner_id=body.linked_account_owner_id,
         project_id=context.project.id,
+    )
+
+    end = time.perf_counter()
+    execution_time = int((end - start) * 1000)
+    execution_id = request_id_ctx_var.get(None)
+    execution_id = UUID(execution_id) if execution_id else uuid.uuid4()
+
+    log_appender.enqueue(
+        function_name=function_name,
+        app_name=app_name,
+        project_id=context.project.id,
+        status=ExecutionStatus.SUCCESS if result.success else ExecutionStatus.FAILED,
+        execution_time=execution_time,
+        linked_account_owner_id=linked_account_owner_id,
+        app_configuration_id=str(app_configuration_id),
+        request=body.function_input,
+        response=result.data if result.success else result.error,
+        created_at=created_at,
+        execution_id=execution_id,
     )
 
     end_time = datetime.now(UTC)
@@ -226,13 +254,13 @@ async def execute(
 
 
 async def execute_function(
-    db_session: Session,
-    project: Project,
-    function_name: str,
-    function_input: dict,
-    linked_account_owner_id: str,
-    project_id: UUID | None = None,
-) -> FunctionExecutionResult:
+        db_session: Session,
+        project: Project,
+        function_name: str,
+        function_input: dict,
+        linked_account_owner_id: str,
+        project_id: UUID | None = None,
+) -> tuple[FunctionExecutionResult, str, str, UUID]:
     """
     Execute a function with the given parameters.
 
@@ -367,19 +395,19 @@ async def execute_function(
             f"error={execution_result.error}"
         )
 
-    return execution_result
+    return execution_result, function.app.name, linked_account_owner_id, app_configuration.id
 
 
 async def get_functions_definitions(
-    db_session: Session,
-    function_names: list[str],
-    format: FunctionDefinitionFormat = FunctionDefinitionFormat.BASIC,
+        db_session: Session,
+        function_names: list[str],
+        format: FunctionDefinitionFormat = FunctionDefinitionFormat.BASIC,
 ) -> list[
     BasicFunctionDefinition
     | OpenAIFunctionDefinition
     | OpenAIResponsesFunctionDefinition
     | AnthropicFunctionDefinition
-]:
+    ]:
     """
     Get function definitions for a list of function names.
 

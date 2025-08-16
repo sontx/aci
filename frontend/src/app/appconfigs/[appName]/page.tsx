@@ -62,7 +62,7 @@ export default function AppConfigDetailPage() {
           <div className="relative h-12 w-12 flex-shrink-0 overflow-hidden rounded-lg">
             {app && (
               <Image
-                src={app?.logo ?? ""}
+                src={app?.logo || "/icon/default-app-icon.svg"}
                 alt={`${app?.display_name} logo`}
                 fill
                 className="object-contain"

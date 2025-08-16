@@ -1,6 +1,8 @@
 import asyncio
 import contextvars
 import json
+import time
+import uuid
 from dataclasses import dataclass
 from datetime import datetime, UTC, timedelta
 from typing import Any, Dict, List
@@ -20,12 +22,15 @@ from aci.common.db.crud.apps import get_app
 from aci.common.db.crud.functions import get_functions_by_app_id
 from aci.common.db.crud.mcp_servers import get_mcp_server_by_id
 from aci.common.db.sql_models import Function, MCPServer
+from aci.common.enums import ExecutionStatus
 from aci.common.exceptions import FunctionNotFound, AppConfigurationNotFound, AppConfigurationDisabled, \
     LinkedAccountNotFound, LinkedAccountDisabled
 from aci.common.logging_setup import get_logger
 from aci.common.schemas.function import FunctionExecutionResult
 from aci.server import config
 from aci.server import security_credentials_manager as scm
+from aci.server.context import request_id_ctx_var
+from aci.server.execution_logs.execution_log_appender import log_appender
 from aci.server.function_executors import get_executor
 from aci.server.security_credentials_manager import SecurityCredentialsResponse
 
@@ -34,9 +39,11 @@ router = APIRouter()
 
 
 class MCPRequestContext:
-    def __init__(self, db_session: Session, linked_account_id: str | None = None):
+    def __init__(self, db_session: Session, linked_account_owner_id: str | None = None,
+                 execution_id: UUID | None = None):
         self.db_session = db_session
-        self.linked_account_id = linked_account_id
+        self.linked_account_owner_id = linked_account_owner_id
+        self.execution_id = execution_id
 
 
 mcp_request_ctx_var = contextvars.ContextVar[MCPRequestContext | None]("mcp_request_ctx_var", default=None)
@@ -79,6 +86,7 @@ class MCPAppServer:
 
         self.app_name = app.name
         self.app_config_id = mcp_server.app_config_id
+        self.project_id = mcp_server.app_configuration.project_id
 
         allowed_function_names = mcp_server.allowed_tools
         allowed_functions: list[Function] = []
@@ -118,13 +126,34 @@ class MCPAppServer:
             logger.info(f"Calling tool {name} with arguments: {arguments}")
 
             context = mcp_request_ctx_var.get()
+            start = time.perf_counter()
+            created_at = datetime.now(UTC)
+
             function, result = await execute_function(
                 db_session=context.db_session,
                 function_name=name,
                 function_input=arguments,
                 app_config_id=self.app_config_id,
                 mcp_server_id=self.mcp_server_id,
-                linked_account_owner_id=context.linked_account_id or "default",
+                linked_account_owner_id=context.linked_account_owner_id or "default",
+            )
+
+            end = time.perf_counter()
+            execution_time = int((end - start) * 1000)
+            execution_id = context.execution_id
+
+            log_appender.enqueue(
+                function_name=name,
+                app_name=self.app_name,
+                project_id=self.project_id,
+                status=ExecutionStatus.SUCCESS if result.success else ExecutionStatus.FAILED,
+                execution_time=execution_time,
+                linked_account_owner_id=context.linked_account_owner_id,
+                app_configuration_id=str(self.app_config_id),
+                request=arguments,
+                response=result.data if result.success else result.error,
+                created_at=created_at,
+                execution_id=execution_id,
             )
 
             # Format the result for MCP
@@ -448,9 +477,15 @@ mcp_server_cache = MCPServerCache()
 async def handle_mcp_request(link: str, request: Request):
     db_session = utils.create_db_session(config.DB_FULL_URL)
     try:
-        linked_account_id = request.headers.get(config.LINKED_ACCOUNT_ID_HEADER,
-                                                request.query_params.get("linked_account_id"))
-        mcp_request_ctx_var.set(MCPRequestContext(db_session=db_session, linked_account_id=linked_account_id))
+        linked_account_owner_id = request.headers.get(config.LINKED_ACCOUNT_OWNER_ID_HEADER,
+                                                      request.query_params.get("linked_account_owner_id"))
+        execution_id = request_id_ctx_var.get(None)
+        execution_id = UUID(execution_id) if execution_id else uuid.uuid4()
+        mcp_request_ctx_var.set(MCPRequestContext(
+            db_session=db_session,
+            linked_account_owner_id=linked_account_owner_id,
+            execution_id=execution_id
+        ))
 
         # Get MCP server for this app (marks as in use)
         mcp_server = await mcp_server_cache.get(link, db_session)

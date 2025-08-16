@@ -120,3 +120,8 @@ class StripeSubscriptionInterval(StrEnum):
 
     MONTH = "month"
     YEAR = "year"
+
+
+class ExecutionStatus(StrEnum):
+    SUCCESS = "success"
+    FAILED = "failed"

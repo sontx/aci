@@ -1,12 +1,12 @@
 import logging
+from contextlib import asynccontextmanager
 from typing import Any
 
 import logfire
 import stripe
-from fastapi import Depends, FastAPI, Request
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-from fastapi.routing import APIRoute, APIRouter
-from pythonjsonlogger.json import JsonFormatter
+from fastapi.routing import APIRoute
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
@@ -14,13 +14,12 @@ from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from aci.common.exceptions import ACIException
 from aci.common.logging_setup import setup_logging
 from aci.server import config
-from aci.server import dependencies as deps
 from aci.server.acl import get_propelauth
 from aci.server.caching import configure_cache_from_env
 from aci.server.dependency_check import check_dependencies
+from aci.server.execution_logs.execution_log_appender import log_appender
 from aci.server.log_schema_filter import LogSchemaFilter
 from aci.server.middleware.interceptor import InterceptorMiddleware, RequestContextFilter
-from aci.server.middleware.ratelimit import RateLimitMiddleware
 from aci.server.routes import (
     analytics,
     app_configurations,
@@ -62,6 +61,15 @@ def custom_generate_unique_id(route: APIRoute) -> str:
     return f"{route.tags[0]}-{route.name}"
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    log_appender.start()
+    yield
+    # Shutdown
+    log_appender.stop()
+
+
 # TODO: move to config
 app = FastAPI(
     title=config.APP_TITLE,
@@ -70,6 +78,7 @@ app = FastAPI(
     redoc_url=config.APP_REDOC_URL,
     openapi_url=config.APP_OPENAPI_URL,
     generate_unique_id_function=custom_generate_unique_id,
+    lifespan=lifespan,
 )
 
 auth = get_propelauth()

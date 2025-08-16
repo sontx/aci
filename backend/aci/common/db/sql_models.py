@@ -16,9 +16,9 @@ for example,
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 from uuid import UUID, uuid4
 
-from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     Boolean,
     DateTime,
@@ -28,16 +28,13 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
-    text, Index,
-)
+    text, Index, )
 from sqlalchemy import Enum as SqlEnum
-
 # Note: need to use postgresqlr ARRAY in order to use overlap operator
 from sqlalchemy.dialects.postgresql import ARRAY, BYTEA, JSONB
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.ext.mutable import MutableDict
 from sqlalchemy.orm import DeclarativeBase, Mapped, MappedAsDataclass, mapped_column, relationship
-from sqlalchemy.sql import expression
 
 from aci.common.db.custom_sql_types import (
     EncryptedSecurityCredentials,
@@ -51,7 +48,7 @@ from aci.common.enums import (
     SecurityScheme,
     StripeSubscriptionInterval,
     StripeSubscriptionStatus,
-    Visibility,
+    Visibility, ExecutionStatus,
 )
 
 APP_DEFAULT_VERSION = "1.0.0"
@@ -585,6 +582,52 @@ class ProcessedStripeEvent(Base):
     )
 
 
+class ExecutionLog(Base):
+    """
+    Parent partitioned table for fast queries.
+    Only light metadata — details go to ExecutionDetail.
+    """
+    __tablename__ = "execution_logs"
+
+    id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        primary_key=True
+    )
+    function_name: Mapped[str] = mapped_column(String(MAX_STRING_LENGTH), nullable=False)
+    app_name: Mapped[str] = mapped_column(String(APP_NAME_MAX_LENGTH), nullable=False)
+    linked_account_owner_id: Mapped[str] = mapped_column(String(MAX_STRING_LENGTH), nullable=True)
+    app_configuration_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=True)
+    status: Mapped[ExecutionStatus] = mapped_column(SqlEnum(ExecutionStatus), nullable=False)
+    execution_time: Mapped[int] = mapped_column(Integer, nullable=False)  # in milliseconds
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        primary_key=True,
+    )
+    project_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+
+    __table_args__ = (
+        # These indexes are created by partitions maintainer
+        # Index("ix_execution_logs_project_id", "project_id"),
+        # Index("ix_execution_logs_project_id_app_name", "project_id", "app_name"),
+        # Index("ix_execution_logs_project_id_function_name", "project_id", "function_name"),
+    )
+
+
+class ExecutionDetail(Base):
+    """
+    Holds request/response JSON for an execution.
+    Shares the same PK as ExecutionLog.id.
+    """
+    __tablename__ = "execution_details"
+
+    id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        primary_key=True
+    )
+    request: Mapped[dict] = mapped_column(JSONB, nullable=True)
+    response: Mapped[Any] = mapped_column(JSONB, nullable=True)
+
+
 __all__ = [
     "APIKey",
     "App",
@@ -595,4 +638,6 @@ __all__ = [
     "MCPServer",
     "Project",
     "Secret",
+    "ExecutionLog",
+    "ExecutionDetail",
 ]
