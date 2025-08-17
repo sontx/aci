@@ -2,8 +2,6 @@
 
 import * as React from "react";
 import { TimePickerInput } from "./time-picker-input";
-import { TimePeriodSelect } from "./time-period-select";
-import { type Period } from "./time-picker-utils";
 import { getTimezoneDetails, getShortLocalTimezone } from "@/utils/dates";
 import { TimeIcon } from "./time-icon";
 import { cn } from "@/lib/utils";
@@ -12,18 +10,18 @@ interface TimePickerProps {
   date: Date | undefined;
   setDate: (date: Date | undefined) => void;
   className?: string;
+  noSeconds?: boolean;
 }
 
-export function TimePicker({ date, setDate, className }: TimePickerProps) {
-  const getInitialPeriod = (date: Date | undefined): Period => {
-    if (!date) return "AM";
-    return date.getHours() >= 12 ? "PM" : "AM";
-  };
-  const [period, setPeriod] = React.useState<Period>(getInitialPeriod(date));
+export function TimePicker({
+  date,
+  setDate,
+  className,
+  noSeconds,
+}: TimePickerProps) {
   const minuteRef = React.useRef<HTMLInputElement>(null);
   const hourRef = React.useRef<HTMLInputElement>(null);
   const secondRef = React.useRef<HTMLInputElement>(null);
-  const periodRef = React.useRef<HTMLButtonElement>(null);
 
   const shortTimezone = React.useMemo(() => getShortLocalTimezone(), []);
   const timezoneDetails = React.useMemo(() => getTimezoneDetails(), []);
@@ -36,12 +34,11 @@ export function TimePicker({ date, setDate, className }: TimePickerProps) {
       )}
     >
       <div className="mx-1 grid gap-1 text-center">
-        <TimeIcon time={date ?? period} />
+        <TimeIcon time={date} />
       </div>
       <div className="grid gap-1 text-center">
         <TimePickerInput
-          picker="12hours"
-          period={period}
+          picker="hours"
           date={date}
           setDate={setDate}
           ref={hourRef}
@@ -60,29 +57,20 @@ export function TimePicker({ date, setDate, className }: TimePickerProps) {
           onRightFocus={() => secondRef.current?.focus()}
         />
       </div>
-      {":"}
-      <div className="grid gap-1">
-        <TimePickerInput
-          picker="seconds"
-          id="seconds"
-          date={date}
-          setDate={setDate}
-          ref={secondRef}
-          onLeftFocus={() => minuteRef.current?.focus()}
-          onRightFocus={() => periodRef.current?.focus()}
-        />
-      </div>
-      <div className="ml-0.5 grid gap-1 text-center">
-        <TimePeriodSelect
-          period={period}
-          setPeriod={setPeriod}
-          date={date}
-          setDate={setDate}
-          ref={periodRef}
-          onLeftFocus={() => secondRef.current?.focus()}
-        />
-      </div>
-      <div className="group relative ml-1">
+      {!noSeconds && ":"}
+      {!noSeconds && (
+        <div className="grid gap-1">
+          <TimePickerInput
+            picker="seconds"
+            id="seconds"
+            date={date}
+            setDate={setDate}
+            ref={secondRef}
+            onLeftFocus={() => minuteRef.current?.focus()}
+          />
+        </div>
+      )}
+      <div className="group relative ml-1 text-muted-foreground">
         <span>{shortTimezone}</span>
         <div className="text-s absolute left-1/2 top-full mt-2 hidden -translate-x-1/2 transform whitespace-nowrap rounded bg-card px-2 py-1 text-card-foreground shadow-md ring-1 ring-border group-hover:block">
           {timezoneDetails}

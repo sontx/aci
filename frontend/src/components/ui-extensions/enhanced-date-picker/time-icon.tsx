@@ -1,6 +1,5 @@
 import * as React from "react";
 import { Clock, Moon, Sun } from "lucide-react";
-import { type Period } from "./time-picker-utils";
 
 const isNoon = (date: Date) =>
   date.getHours() === 12 && date.getMinutes() === 0 && date.getSeconds() === 0;
@@ -8,21 +7,12 @@ const isNoon = (date: Date) =>
 const isMidnight = (date: Date) =>
   date.getHours() === 0 && date.getMinutes() === 0 && date.getSeconds() === 0;
 
-const getIconForPeriod = (period: Period) => {
-  const icons = {
-    PM: <Sun className={"size-5"} />,
-    AM: <Moon className={"size-5"} />,
-  };
-
-  return icons[period] || <Clock className={"size-5"} />;
-};
-
-export const TimeIcon: React.FC<{ time: Date | Period }> = ({ time }) => {
+export const TimeIcon: React.FC<{ time: Date | undefined }> = ({ time }) => {
   if (time instanceof Date) {
-    if (isNoon(time)) return <Sun className="size-5" />;
-    if (isMidnight(time)) return <Moon className="size-5" />;
-    return <Clock className="size-5" />;
+    if (isNoon(time)) return <Sun className="size-5 text-muted-foreground" />;
+    if (isMidnight(time)) return <Moon className="size-5 text-muted-foreground" />;
+    return <Clock className="size-5 text-muted-foreground" />;
   }
 
-  return getIconForPeriod(time);
+  return <Clock className="size-5 text-muted-foreground" />;
 };

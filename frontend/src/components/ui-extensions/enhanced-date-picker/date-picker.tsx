@@ -197,25 +197,30 @@ export function DatePickerWithRange({
     <div
       className={cn("my-3 flex flex-col-reverse gap-2 md:flex-row", className)}
     >
+      <DashboardDateRangeDropdown
+        selectedOption={selectedOption}
+        setDateRangeAndOption={setDateRangeAndOption}
+        logRetentionDays={logRetentionDays}
+      />
       <Popover>
         <PopoverTrigger asChild>
           <Button
             id="date"
             variant={"outline"}
             className={cn(
-              "w-[330px] justify-start text-left font-normal",
+              "justify-start text-left font-normal",
               !internalDateRange && "text-muted-foreground",
             )}
           >
-            <CalendarIcon className="mr-2 h-4 w-4" />
+            <CalendarIcon className="h-4 w-4" />
             {internalDateRange?.from ? (
               internalDateRange.to ? (
                 <>
-                  {format(internalDateRange.from, "LLL dd, yy : HH:mm")} -{" "}
-                  {format(internalDateRange.to, "LLL dd, yy : HH:mm")}
+                  {format(internalDateRange.from, "dd/MM/yyyy HH:mm")} -{" "}
+                  {format(internalDateRange.to, "dd/MM/yyyy HH:mm")}
                 </>
               ) : (
-                format(internalDateRange.from, "LLL dd, y")
+                format(internalDateRange.from, "dd/MM/yyyy")
               )
             ) : (
               <span>Pick a date</span>
@@ -225,6 +230,7 @@ export function DatePickerWithRange({
         <PopoverContent className="w-auto p-0" align="start">
           <Calendar
             mode="range"
+            captionLayout="dropdown"
             defaultMonth={internalDateRange?.from}
             selected={internalDateRange}
             onSelect={onCalendarSelection}
@@ -249,31 +255,28 @@ export function DatePickerWithRange({
               root: "w-full",
             }}
           />
-          <div className="flex flex-row border-t-2 py-1.5">
+          <div className="flex flex-row border-t py-3">
             <div className="px-3">
-              <p className="px-1 text-sm font-medium">Start time</p>
+              <p className="px-1 text-sm font-medium text-muted-foreground">Start time</p>
               <TimePicker
                 date={internalDateRange?.from}
                 setDate={onStartTimeSelection}
                 className="border-0 px-0 pt-1"
+                noSeconds
               />
             </div>
             <div className="px-3">
-              <p className="px-1 text-sm font-medium">End time</p>
+              <p className="px-1 text-sm font-medium text-muted-foreground">End time</p>
               <TimePicker
                 date={internalDateRange?.to}
                 setDate={onEndTimeSelection}
                 className="border-0 px-0 pt-1"
+                noSeconds
               />
             </div>
           </div>
         </PopoverContent>
       </Popover>
-      <DashboardDateRangeDropdown
-        selectedOption={selectedOption}
-        setDateRangeAndOption={setDateRangeAndOption}
-        logRetentionDays={logRetentionDays}
-      />
     </div>
   );
 }

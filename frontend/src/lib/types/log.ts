@@ -39,3 +39,27 @@ export interface LogSearchParams {
   limit?: number;
   cursor?: string;
 }
+
+export interface ExecutionLog {
+  id: string; // UUID
+  function_name: string;
+  app_name: string;
+  linked_account_owner_id?: string | null;
+  app_configuration_id?: string | null; // UUID
+  status: ExecutionStatus;
+  execution_time: number; // in milliseconds
+  created_at: string; // ISO 8601 datetime string
+  project_id: string; // UUID
+}
+
+export interface ExecutionDetail {
+  id: string; // UUID
+  request?: Record<string, unknown> | null;
+  response?: unknown | null;
+}
+
+// Enums for ExecutionStatus
+export enum ExecutionStatus {
+  SUCCESS = "success",
+  FAILED = "failed",
+}

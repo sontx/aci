@@ -21,6 +21,7 @@ function AppItemWithApp({ app, link }: { app: AppLike; link?: string }) {
     <RouterLink
       href={link ?? `/apps/${app.name}`}
       className="flex items-center gap-3 text-nowrap"
+      title={app.name}
     >
       <div className="relative h-5 w-5 flex-shrink-0 overflow-hidden">
         <Image

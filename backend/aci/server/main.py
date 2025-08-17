@@ -27,6 +27,7 @@ from aci.server.routes import (
     user_apps,
     user_functions,
     billing,
+    execution_logs,
     functions,
     health,
     linked_accounts,
@@ -190,6 +191,12 @@ app.include_router(
     analytics.router,
     prefix=config.ROUTER_PREFIX_ANALYTICS,
     tags=[config.ROUTER_PREFIX_ANALYTICS.split("/")[-1]],
+)
+
+app.include_router(
+    execution_logs.router,
+    prefix=config.ROUTER_PREFIX_EXECUTION_LOGS,
+    tags=[config.ROUTER_PREFIX_EXECUTION_LOGS.split("/")[-1]],
 )
 
 # No auth required for webhooks, as they are called by external services

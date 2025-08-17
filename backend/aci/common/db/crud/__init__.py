@@ -1,6 +1,7 @@
 from . import (
     app_configurations,
     apps,
+    execution_logs,
     functions,
     linked_accounts,
     plans,
@@ -14,6 +15,7 @@ from . import (
 __all__ = [
     "app_configurations",
     "apps",
+    "execution_logs",
     "functions",
     "linked_accounts",
     "plans",

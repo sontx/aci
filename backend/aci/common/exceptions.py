@@ -472,3 +472,15 @@ class ConflictError(ACIException):
             message=message,
             error_code=status.HTTP_409_CONFLICT,
         )
+
+class ExecutionLogNotFound(ACIException):
+    """
+    Exception raised when an execution log is not found
+    """
+
+    def __init__(self, message: str | None = None):
+        super().__init__(
+            title="Execution log not found",
+            message=message,
+            error_code=status.HTTP_404_NOT_FOUND,
+        )
