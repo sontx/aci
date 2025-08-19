@@ -19,7 +19,7 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 
-@router.get("/", response_model=Paged[ExecutionLogResponse])
+@router.get("", response_model=Paged[ExecutionLogResponse])
 async def get_execution_logs(
     context: Annotated[RequestContext, Depends(get_request_context)],
     start_time: datetime | None = Query(
