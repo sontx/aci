@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -51,6 +52,7 @@ const formSchema = z
     appName: z.string().min(1, "App name is required"),
     authType: z.enum(["api_key", "oauth2", "no_auth"]),
     linkedAccountOwnerId: z.string().min(1, "Account owner ID is required"),
+    description: z.string().optional(),
     apiKey: z.string().optional(),
   })
   .refine(
@@ -80,9 +82,10 @@ export interface AppInfo {
 }
 interface AddAccountProps {
   appInfos: AppInfo[];
+  children?: React.ReactNode;
 }
 
-export function AddAccountForm({ appInfos }: AddAccountProps) {
+export function AddAccountForm({ appInfos, children }: AddAccountProps) {
   const [open, setOpen] = useState(false);
 
   const { mutateAsync: createApiLinkedAccount } = useCreateAPILinkedAccount();
@@ -111,6 +114,7 @@ export function AddAccountForm({ appInfos }: AddAccountProps) {
         | "oauth2"
         | "no_auth",
       linkedAccountOwnerId: "",
+      description: "",
       apiKey: "",
     },
   });
@@ -183,6 +187,7 @@ export function AddAccountForm({ appInfos }: AddAccountProps) {
     appName: string,
     linkedAccountOwnerId: string,
     linkedAPIKey: string,
+    description?: string,
   ) => {
     if (!appName) {
       throw new Error("No app selected");
@@ -193,6 +198,7 @@ export function AddAccountForm({ appInfos }: AddAccountProps) {
         appName,
         linkedAccountOwnerId,
         linkedAPIKey,
+        description,
       });
 
       toast.success("Account linked successfully");
@@ -206,6 +212,7 @@ export function AddAccountForm({ appInfos }: AddAccountProps) {
   const linkNoAuthAccount = async (
     appName: string,
     linkedAccountOwnerId: string,
+    description?: string,
   ) => {
     if (!appName) {
       throw new Error("No app selected");
@@ -215,6 +222,7 @@ export function AddAccountForm({ appInfos }: AddAccountProps) {
       await createNoAuthLinkedAccount({
         appName,
         linkedAccountOwnerId,
+        description,
       });
 
       toast.success("Account linked successfully");
@@ -245,10 +253,11 @@ export function AddAccountForm({ appInfos }: AddAccountProps) {
           values.appName,
           values.linkedAccountOwnerId,
           values.apiKey as string,
+          values.description,
         );
         break;
       case FORM_SUBMIT_NO_AUTH:
-        await linkNoAuthAccount(values.appName, values.linkedAccountOwnerId);
+        await linkNoAuthAccount(values.appName, values.linkedAccountOwnerId, values.description);
         break;
     }
   };
@@ -263,20 +272,22 @@ export function AddAccountForm({ appInfos }: AddAccountProps) {
     >
       <div className="flex items-center gap-2">
         <DialogTrigger asChild>
-          <Button>
-            <GoPlus />
-            Add Account
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="cursor-pointer">
-                  <BsQuestionCircle className="h-4 w-4 " />
-                </span>
-              </TooltipTrigger>
-              <TooltipContent side="top">
-                <p className="text-xs">{"Add an end-user account."}</p>
-              </TooltipContent>
-            </Tooltip>
-          </Button>
+          {children || (
+            <Button>
+              <GoPlus />
+              Add Account
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="cursor-pointer">
+                    <BsQuestionCircle className="h-4 w-4 " />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  <p className="text-xs">{"Add an end-user account."}</p>
+                </TooltipContent>
+              </Tooltip>
+            </Button>
+          )}
         </DialogTrigger>
       </div>
       <DialogContent>
@@ -380,6 +391,24 @@ export function AddAccountForm({ appInfos }: AddAccountProps) {
                   </div>
                   <FormControl>
                     <Input placeholder="linked account owner id" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Description (Optional)</FormLabel>
+                  <FormControl>
+                    <Textarea 
+                      placeholder="Description for this linked account" 
+                      className="min-h-9"
+                      {...field} 
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

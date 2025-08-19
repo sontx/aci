@@ -1,6 +1,5 @@
 "use client";
 
-import { EnhancedSwitch } from "@/components/ui-extensions/enhanced-switch/enhanced-switch";
 import { Badge } from "@/components/ui/badge";
 import { LinkedAccount } from "@/lib/types/linkedaccount";
 import { formatToLocalTime } from "@/utils/time";
@@ -8,12 +7,10 @@ import { AppItemDisplay } from "../apps/app-item-display";
 
 interface LinkedAccountOverviewProps {
   linkedAccount: LinkedAccount;
-  onToggleStatus?: (accountId: string, newStatus: boolean) => Promise<boolean>;
 }
 
 export function LinkedAccountOverview({ 
-  linkedAccount, 
-  onToggleStatus 
+  linkedAccount
 }: LinkedAccountOverviewProps) {
   return (
     <div className="space-y-4">
@@ -51,22 +48,10 @@ export function LinkedAccountOverview({
           <label className="text-sm font-medium text-muted-foreground">
             Status
           </label>
-          <div className="mt-1 flex items-center gap-2">
+          <div className="mt-1">
             <Badge variant={linkedAccount.enabled ? "default" : "secondary"}>
               {linkedAccount.enabled ? "Enabled" : "Disabled"}
             </Badge>
-            {onToggleStatus && (
-              <EnhancedSwitch
-                checked={linkedAccount.enabled}
-                onAsyncChange={async (checked) => {
-                  return await onToggleStatus(linkedAccount.id, checked);
-                }}
-                successMessage={(newState) => {
-                  return `Linked account ${linkedAccount.linked_account_owner_id} ${newState ? "enabled" : "disabled"}`;
-                }}
-                errorMessage="Failed to update linked account status"
-              />
-            )}
           </div>
         </div>
 

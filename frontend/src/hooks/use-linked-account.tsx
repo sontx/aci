@@ -56,6 +56,7 @@ export const useAppLinkedAccounts = (appName?: string | null) => {
 type CreateAPILinkedAccountParams = {
   appName: string;
   linkedAccountOwnerId: string;
+  description?: string;
   linkedAPIKey: string;
 };
 
@@ -84,6 +85,7 @@ export const useCreateAPILinkedAccount = () => {
 type CreateNoAuthLinkedAccountParams = {
   appName: string;
   linkedAccountOwnerId: string;
+  description?: string;
 };
 
 export const useCreateNoAuthLinkedAccount = () => {
@@ -108,6 +110,7 @@ export const useCreateNoAuthLinkedAccount = () => {
 type GetOauth2LinkURLParams = {
   appName: string;
   linkedAccountOwnerId: string;
+  description?: string;
   afterOAuth2LinkRedirectURL?: string;
 };
 
@@ -145,6 +148,7 @@ export const useDeleteLinkedAccount = () => {
 type UpdateLinkedAccountParams = {
   linkedAccountId: string;
   enabled: boolean;
+  description?: string;
 };
 
 export const useUpdateLinkedAccount = () => {
@@ -153,7 +157,7 @@ export const useUpdateLinkedAccount = () => {
 
   return useMutation<LinkedAccount, Error, UpdateLinkedAccountParams>({
     mutationFn: (params) =>
-      updateLinkedAccount(params.linkedAccountId, params.enabled),
+      updateLinkedAccount(params.linkedAccountId, params.enabled, params.description),
     onSuccess: () =>
       queryClient.invalidateQueries({
         queryKey: linkedAccountKeys.all(activeProject.id),

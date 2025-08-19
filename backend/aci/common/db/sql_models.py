@@ -425,6 +425,7 @@ class LinkedAccount(Base):
     # is the owner of the linked account. One common design is to use the same linked_account_owner_id that
     # identifies an end user for all configured apps in a project.
     linked_account_owner_id: Mapped[str] = mapped_column(String(MAX_STRING_LENGTH), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=True)
     security_scheme: Mapped[SecurityScheme] = mapped_column(SqlEnum(SecurityScheme), nullable=False)
     # security credentials are different for each security scheme, e.g., API key, OAuth2 (access token, refresh token, scope, etc) etc
     # it can beempty dict because the linked account could be created to use default credentials provided by ACI

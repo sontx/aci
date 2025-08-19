@@ -14,6 +14,7 @@ from aci.common.schemas.security_scheme import (
 class LinkedAccountCreateBase(BaseModel):
     app_name: str
     linked_account_owner_id: str
+    description: str | None = None
 
 
 class LinkedAccountOAuth2Create(LinkedAccountCreateBase):
@@ -34,6 +35,7 @@ class LinkedAccountNoAuthCreate(LinkedAccountCreateBase):
 
 class LinkedAccountUpdate(BaseModel):
     enabled: bool | None = None
+    description: str | None = None
 
 
 class LinkedAccountOAuth2CreateState(BaseModel):
@@ -54,6 +56,7 @@ class LinkedAccountPublic(BaseModel):
     project_id: UUID
     app_name: str
     linked_account_owner_id: str
+    description: str | None = None
     security_scheme: SecurityScheme
     # NOTE: unnecessary to expose the security credentials
     enabled: bool

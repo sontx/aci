@@ -24,13 +24,25 @@ export async function createAPILinkedAccount(
   appName: string,
   linkedAccountOwnerId: string,
   linkedAPIKey: string,
+  description?: string,
 ): Promise<LinkedAccount> {
   try {
-    const response = await axiosInstance.post('/v1/linked-accounts/api-key', {
+    const requestBody: {
+      app_name: string;
+      linked_account_owner_id: string;
+      api_key: string;
+      description?: string;
+    } = {
       app_name: appName,
       linked_account_owner_id: linkedAccountOwnerId,
       api_key: linkedAPIKey,
-    });
+    };
+
+    if (description) {
+      requestBody.description = description;
+    }
+
+    const response = await axiosInstance.post('/v1/linked-accounts/api-key', requestBody);
 
     return response.data;
   } catch (error) {
@@ -44,12 +56,23 @@ export async function createAPILinkedAccount(
 export async function createNoAuthLinkedAccount(
   appName: string,
   linkedAccountOwnerId: string,
+  description?: string,
 ): Promise<LinkedAccount> {
   try {
-    const response = await axiosInstance.post('/v1/linked-accounts/no-auth', {
+    const requestBody: {
+      app_name: string;
+      linked_account_owner_id: string;
+      description?: string;
+    } = {
       app_name: appName,
       linked_account_owner_id: linkedAccountOwnerId,
-    });
+    };
+
+    if (description) {
+      requestBody.description = description;
+    }
+
+    const response = await axiosInstance.post('/v1/linked-accounts/no-auth', requestBody);
 
     return response.data;
   } catch (error) {
@@ -96,10 +119,20 @@ export async function deleteLinkedAccount(linkedAccountId: string): Promise<void
 export async function updateLinkedAccount(
   linkedAccountId: string,
   enabled: boolean,
+  description?: string,
 ): Promise<LinkedAccount> {
-  const response = await axiosInstance.patch(`/v1/linked-accounts/${linkedAccountId}`, {
+  const requestBody: {
+    enabled: boolean;
+    description?: string;
+  } = {
     enabled,
-  });
+  };
+
+  if (description !== undefined) {
+    requestBody.description = description;
+  }
+
+  const response = await axiosInstance.patch(`/v1/linked-accounts/${linkedAccountId}`, requestBody);
 
   return response.data;
 }

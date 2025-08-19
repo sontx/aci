@@ -8,6 +8,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
 import {
@@ -37,6 +38,7 @@ export const FORM_SUBMIT_NO_AUTH = "noAuth";
 // Form schema for linked account
 export interface LinkedAccountFormValues {
   linkedAccountOwnerId: string;
+  description?: string;
   apiKey?: string;
   _authType?: string;
 }
@@ -44,6 +46,7 @@ export interface LinkedAccountFormValues {
 export const linkedAccountFormSchema = z
   .object({
     linkedAccountOwnerId: z.string().min(1, "Account owner ID is required"),
+    description: z.string().optional(),
     apiKey: z.string().optional(),
     _authType: z.string().optional(),
   })
@@ -77,6 +80,7 @@ export function LinkedAccountStep({
     resolver: zodResolver(linkedAccountFormSchema),
     defaultValues: {
       linkedAccountOwnerId: "",
+      description: "",
       apiKey: "",
     },
   });
@@ -162,6 +166,7 @@ export function LinkedAccountStep({
   const linkAPIAccount = async (
     linkedAccountOwnerId: string,
     linkedAPIKey: string,
+    description?: string,
   ) => {
     if (!appName) {
       throw new Error("no app selected");
@@ -172,6 +177,7 @@ export function LinkedAccountStep({
         appName,
         linkedAccountOwnerId,
         linkedAPIKey,
+        description,
       });
 
       toast.success("account linked successfully");
@@ -182,7 +188,7 @@ export function LinkedAccountStep({
     }
   };
 
-  const linkNoAuthAccount = async (linkedAccountOwnerId: string) => {
+  const linkNoAuthAccount = async (linkedAccountOwnerId: string, description?: string) => {
     if (!appName) {
       throw new Error("no app selected");
     }
@@ -191,6 +197,7 @@ export function LinkedAccountStep({
       await createNoAuthLinkedAccount({
         appName,
         linkedAccountOwnerId,
+        description,
       });
 
       toast.success("account linked successfully");
@@ -237,10 +244,11 @@ export function LinkedAccountStep({
           await linkAPIAccount(
             values.linkedAccountOwnerId,
             values.apiKey as string,
+            values.description,
           );
           break;
         case FORM_SUBMIT_NO_AUTH:
-          await linkNoAuthAccount(values.linkedAccountOwnerId);
+          await linkNoAuthAccount(values.linkedAccountOwnerId, values.description);
           break;
       }
     } catch (error) {
@@ -297,6 +305,24 @@ export function LinkedAccountStep({
                 </div>
                 <FormControl>
                   <Input placeholder="linked account owner id" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="description"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Description (Optional)</FormLabel>
+                <FormControl>
+                  <Textarea 
+                    placeholder="Description for this linked account" 
+                    className="min-h-9"
+                    {...field} 
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>

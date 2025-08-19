@@ -81,6 +81,7 @@ def create_linked_account(
     db_session: Session,
     project_id: UUID,
     app_name: str,
+    description: str | None,
     linked_account_owner_id: str,
     security_scheme: SecurityScheme,
     security_credentials: OAuth2SchemeCredentials
@@ -98,6 +99,7 @@ def create_linked_account(
         project_id=project_id,
         app_id=app_id,
         linked_account_owner_id=linked_account_owner_id,
+        description=description,
         security_scheme=security_scheme,
         security_credentials=(
             security_credentials.model_dump(mode="json") if security_credentials else {}
@@ -139,6 +141,8 @@ def update_linked_account(
 ) -> LinkedAccount:
     if linked_account_update.enabled is not None:
         linked_account.enabled = linked_account_update.enabled
+    if linked_account_update.description is not None:
+        linked_account.description = linked_account_update.description
     db_session.flush()
     db_session.refresh(linked_account)
     return linked_account

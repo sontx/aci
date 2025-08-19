@@ -1,7 +1,9 @@
 "use client";
 
-import { IdDisplay } from "@/components/apps/id-display";
-import { LinkedAccountOverview } from "@/components/linkedaccount/linked-account-overview";
+import {
+  EditLinkedAccountForm,
+  LinkedAccountOverview,
+} from "@/components/linkedaccount";
 import { LogsView } from "@/components/logs";
 import {
   AlertDialog,
@@ -12,20 +14,22 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  MoreButton,
+  SecondaryAction,
+} from "@/components/ui-extensions/more-button";
 import { useApp } from "@/hooks/use-app";
 import {
   useDeleteLinkedAccount,
   useLinkedAccount,
-  useUpdateLinkedAccount,
 } from "@/hooks/use-linked-account";
+import { Edit, Trash2 } from "lucide-react";
 import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
-import { useCallback } from "react";
-import { GoTrash } from "react-icons/go";
+import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 export default function LinkedAccountDetailPage() {
@@ -35,24 +39,8 @@ export default function LinkedAccountDetailPage() {
   const { data: linkedAccount, isLoading: isLinkedAccountLoading } =
     useLinkedAccount(linkedAccountId);
   const { data: app } = useApp(linkedAccount?.app_name || "");
-  const { mutateAsync: updateLinkedAccount } = useUpdateLinkedAccount();
   const { mutateAsync: deleteLinkedAccount } = useDeleteLinkedAccount();
-
-  const toggleAccountStatus = useCallback(
-    async (accountId: string, newStatus: boolean) => {
-      try {
-        await updateLinkedAccount({
-          linkedAccountId: accountId,
-          enabled: newStatus,
-        });
-        return true;
-      } catch (error) {
-        console.error("Failed to update linked account:", error);
-        return false;
-      }
-    },
-    [updateLinkedAccount],
-  );
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const handleDelete = useCallback(async () => {
     if (!linkedAccount) return;
@@ -70,6 +58,21 @@ export default function LinkedAccountDetailPage() {
       toast.error("Failed to delete linked account");
     }
   }, [linkedAccount, deleteLinkedAccount, router]);
+
+  const secondaryActions = useMemo<SecondaryAction[]>(
+    () => [
+      {
+        label: "Delete Account",
+        description: "Permanently delete this linked account",
+        icon: <Trash2 className="h-4 w-4" />,
+        onClick: () => {
+          setShowDeleteDialog(true);
+        },
+        destructive: true,
+      },
+    ],
+    [],
+  );
 
   if (isLinkedAccountLoading) {
     return (
@@ -108,37 +111,23 @@ export default function LinkedAccountDetailPage() {
             <h1 className="text-2xl font-semibold">
               {linkedAccount.linked_account_owner_id}
             </h1>
-            <IdDisplay id={linkedAccount.id} />
+            <span className="text-sm text-muted-foreground">
+              {linkedAccount.description}
+            </span>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="destructive" size="sm">
-                <GoTrash className="h-4 w-4 mr-2" />
-                Delete Account
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Confirm Deletion?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This action cannot be undone. This will permanently delete the
-                  linked account for owner ID &quot;
-                  {linkedAccount.linked_account_owner_id}&quot;.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={handleDelete}
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                >
-                  Delete
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+        <div className="flex gap-2">
+          <MoreButton
+            primaryActionComponent={
+              <EditLinkedAccountForm linkedAccount={linkedAccount}>
+                <Button className="rounded-r-none border-r-0">
+                  <Edit className="h-4 w-4 mr-2" />
+                  Edit Account
+                </Button>
+              </EditLinkedAccountForm>
+            }
+            secondaryActions={secondaryActions}
+          />
         </div>
       </div>
 
@@ -149,10 +138,7 @@ export default function LinkedAccountDetailPage() {
         </TabsList>
 
         <TabsContent value="details">
-          <LinkedAccountOverview
-            linkedAccount={linkedAccount}
-            onToggleStatus={toggleAccountStatus}
-          />
+          <LinkedAccountOverview linkedAccount={linkedAccount} />
         </TabsContent>
 
         <TabsContent value="logs">
@@ -161,6 +147,28 @@ export default function LinkedAccountDetailPage() {
           />
         </TabsContent>
       </Tabs>
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Linked Account</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the linked account for owner ID{" "}
+              <strong>{linkedAccount.linked_account_owner_id}</strong>? This
+              action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              destructive
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
