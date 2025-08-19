@@ -18,6 +18,8 @@ def get_execution_logs(
     end_time: Optional[datetime] = None,
     app_name: Optional[str] = None,
     function_name: Optional[str] = None,
+    app_configuration_id: UUID | None = None,
+    linked_account_owner_id: str | None = None,
     limit: int = 100,
     offset: int = 0,
 ) -> list[ExecutionLog]:
@@ -45,6 +47,12 @@ def get_execution_logs(
 
     if function_name:
         statement = statement.filter(ExecutionLog.function_name == function_name)
+
+    if app_configuration_id:
+        statement = statement.filter(ExecutionLog.app_configuration_id == app_configuration_id)
+
+    if linked_account_owner_id:
+        statement = statement.filter(ExecutionLog.linked_account_owner_id == linked_account_owner_id)
 
     # Order by created_at descending (most recent first)
     statement = statement.order_by(ExecutionLog.created_at.desc())

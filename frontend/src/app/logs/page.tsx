@@ -1,40 +1,11 @@
 "use client";
 
 import {
-  LogDetailSheet,
-  LogsDateFilter,
-  LogsTableView,
-  useLogsTable,
-  useLogsTableColumns,
+  LogsView
 } from "@/components/logs";
 import { Separator } from "@/components/ui/separator";
 
 export default function LogsPage() {
-  const {
-    // Data
-    logs,
-    isLoading,
-
-    // Detail panel state
-    selectedLogEntry,
-    isDetailPanelOpen,
-
-    // Date range
-    dateRange,
-    selectedDateOption,
-
-    // Actions
-    handleViewDetails,
-    closeDetailPanel,
-    setDateRangeAndOption,
-    refetch,
-  } = useLogsTable();
-
- 
-  const columns = useLogsTableColumns({
-    onViewDetails: handleViewDetails,
-  });
-
   return (
     <div className="w-full">
       <div className="m-4">
@@ -47,24 +18,7 @@ export default function LogsPage() {
       <Separator />
 
       <div className="m-4">
-        <LogsDateFilter
-          dateRange={dateRange}
-          selectedDateOption={selectedDateOption}
-          onDateRangeChange={setDateRangeAndOption}
-          onRefresh={refetch}
-          isLoading={isLoading}
-        />
-
-        <LogsTableView
-          logs={logs}
-          columns={columns}
-          isLoading={isLoading}
-        />
-        <LogDetailSheet
-          selectedLogEntry={selectedLogEntry}
-          isOpen={isDetailPanelOpen}
-          onOpenChange={closeDetailPanel}
-        />
+        <LogsView />
       </div>
     </div>
   );

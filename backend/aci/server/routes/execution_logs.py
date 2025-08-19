@@ -38,6 +38,14 @@ async def get_execution_logs(
         default=None,
         description="Filter logs by function name"
     ),
+    app_configuration_id: UUID | None = Query(
+        default=None,
+        description="Filter logs by app configuration ID"
+    ),
+    linked_account_owner_id: str | None = Query(
+        default=None,
+        description="Filter logs by linked account owner ID"
+    ),
     limit: int = Query(
         default=100,
         ge=1,
@@ -68,6 +76,8 @@ async def get_execution_logs(
         end_time=end_time,
         app_name=app_name,
         function_name=function_name,
+        app_configuration_id=app_configuration_id,
+        linked_account_owner_id=linked_account_owner_id,
         limit=limit,
         offset=offset,
     )

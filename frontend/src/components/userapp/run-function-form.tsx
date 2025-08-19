@@ -28,6 +28,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import SchemaGuardForm from "@/components/ui-extensions/schema-guard-form";
+import { tryParseJson } from "@/utils/object-utils";
 
 export interface RunFunctionFormContentProps {
   functionName: string;
@@ -56,7 +57,6 @@ function RunFunctionFormContent({
   const [functionInput, setFunctionInput] = useState<Record<string, unknown>>(
     {},
   );
-  const [isFunctionInputValid, setIsFunctionInputValid] = useState(false);
   const [executionResult, setExecutionResult] =
     useState<FunctionExecutionResult | null>(null);
   const [isExecuting, setIsExecuting] = useState(false);
@@ -77,17 +77,13 @@ function RunFunctionFormContent({
 
   // JsonSchema for function input
   const functionInputSchema = useMemo(
-    () =>
-      typeof functionData?.parameters === "string"
-        ? JSON.parse(functionData.parameters)
-        : functionData?.parameters,
+    () => tryParseJson(functionData?.parameters, {}),
     [functionData?.parameters],
   );
 
   const handleFunctionInputChange = useCallback(
-    (input: Record<string, unknown>, isValid: boolean) => {
+    (input: Record<string, unknown>) => {
       setFunctionInput(input);
-      setIsFunctionInputValid(isValid);
     },
     [setFunctionInput],
   );
@@ -273,13 +269,11 @@ function RunFunctionFormContent({
           onClick={onCancel}
           disabled={isExecuting}
         >
-          Cancel
+          Close
         </Button>
         <Button
           onClick={handleExecuteFunction}
-          disabled={
-            !selectedLinkedAccountId || isExecuting || !isFunctionInputValid
-          }
+          disabled={!selectedLinkedAccountId || isExecuting}
         >
           {isExecuting ? (
             <>

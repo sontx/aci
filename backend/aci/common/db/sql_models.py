@@ -608,6 +608,8 @@ class ExecutionLog(Base):
     __table_args__ = (
         # These indexes are created by partitions maintainer
         # Index("ix_execution_logs_project_id", "project_id"),
+        # Index("ix_execution_logs_project_id_app_config_id", "project_id", "app_configuration_id"),
+        # Index("ix_execution_logs_project_id_linked_account_id", "project_id", "linked_account_owner_id"),
         # Index("ix_execution_logs_project_id_app_name", "project_id", "app_name"),
         # Index("ix_execution_logs_project_id_function_name", "project_id", "function_name"),
     )

@@ -7,6 +7,11 @@ export async function getAllLinkedAccounts(): Promise<LinkedAccount[]> {
   return response.data;
 }
 
+export async function getLinkedAccount(linkedAccountId: string): Promise<LinkedAccount> {
+  const response = await axiosInstance.get(`/v1/linked-accounts/${linkedAccountId}`);
+  return response.data;
+}
+
 export async function getAppLinkedAccounts(appName: string): Promise<LinkedAccount[]> {
   const params = new URLSearchParams();
   params.append("app_name", appName);

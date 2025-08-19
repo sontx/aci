@@ -24,6 +24,7 @@ import { useApp } from "@/hooks/use-app";
 import { useAppConfig } from "@/hooks/use-app-config";
 import { MCPServerForm } from "@/components/mcpserver/mcp-server-form";
 import { useLinkedAccountsTableColumns } from "@/components/linkedaccount/useLinkedAccountsTableColumns";
+import { LogsView } from "@/components/logs";
 
 export default function AppConfigDetailPage() {
   const { appName } = useParams<{ appName: string }>();
@@ -115,15 +116,33 @@ export default function AppConfigDetailPage() {
                 <TooltipContent side="top">
                   <p className="text-xs">
                     {
-                      "This shows a list of end-users who have connected their account in this application to your agent."
+                      "This shows a list of end-users who have connected their account in this application."
                     }
                   </p>
                 </TooltipContent>
               </Tooltip>
             </div>
           </TabsTrigger>
-          {/* <TabsTrigger value="logs">Logs</TabsTrigger>
-          <TabsTrigger value="settings">Settings</TabsTrigger> */}
+          <TabsTrigger value="logs">
+            Execution Logs
+            <div className="ml-2">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="cursor-pointer">
+                    <BsQuestionCircle className="h-4 w-4 text-muted-foreground" />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  <p className="text-xs">
+                    {
+                      "This shows execution logs for all functions belonging to this app configuration."
+                    }
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          </TabsTrigger>
+          {/* <TabsTrigger value="settings">Settings</TabsTrigger> */}
         </TabsList>
 
         <TabsContent value="linked">
@@ -137,11 +156,11 @@ export default function AppConfigDetailPage() {
           />
         </TabsContent>
 
-        {/* <TabsContent value="logs">
-          <div className="text-gray-500">Logs content coming soon...</div>
+        <TabsContent value="logs">
+          <LogsView appConfigId={appConfig?.id} />
         </TabsContent>
 
-        <TabsContent value="settings">
+        {/* <TabsContent value="settings">
           <div className="text-gray-500">Settings content coming soon...</div>
         </TabsContent> */}
       </Tabs>

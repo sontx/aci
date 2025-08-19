@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 import {
   getAllLinkedAccounts,
+  getLinkedAccount,
   createAPILinkedAccount,
   createNoAuthLinkedAccount,
   deleteLinkedAccount,
@@ -16,6 +17,7 @@ import { useMetaInfo } from "@/components/context/metainfo";
 
 export const linkedAccountKeys = {
   all: (projectId: string) => [projectId, "linkedaccounts"] as const,
+  detail: (projectId: string, linkedAccountId: string) => [projectId, "linkedaccounts", linkedAccountId] as const,
 };
 
 export const useLinkedAccounts = () => {
@@ -24,6 +26,16 @@ export const useLinkedAccounts = () => {
   return useQuery<LinkedAccount[], Error>({
     queryKey: linkedAccountKeys.all(activeProject.id),
     queryFn: () => getAllLinkedAccounts(),
+  });
+};
+
+export const useLinkedAccount = (linkedAccountId?: string) => {
+  const { activeProject } = useMetaInfo();
+
+  return useQuery<LinkedAccount, Error>({
+    queryKey: linkedAccountKeys.detail(activeProject.id, linkedAccountId || ""),
+    queryFn: () => getLinkedAccount(linkedAccountId!),
+    enabled: !!linkedAccountId,
   });
 };
 

@@ -4,6 +4,7 @@ import { LinkedAccount } from "@/lib/types/linkedaccount";
 import { Button } from "@/components/ui/button";
 import { GoTrash } from "react-icons/go";
 import { ArrowUpDown, Eye } from "lucide-react";
+import Link from "next/link";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,6 +33,7 @@ export const useLinkedAccountsTableColumns = (
     newStatus: boolean,
   ) => Promise<boolean>,
   noAppnameColumn = false,
+  useDetailPage = false,
 ): ColumnDef<LinkedAccount>[] => {
   const { mutateAsync: deleteLinkedAccount } = useDeleteLinkedAccount();
   const { activeProject } = useMetaInfo();
@@ -150,14 +152,22 @@ export const useLinkedAccountsTableColumns = (
             const account = info.getValue();
             return (
               <div className="space-x-2 flex">
-                <LinkedAccountDetails
-                  account={account}
-                  toggleAccountStatus={toggleAccountStatus}
-                >
-                  <Button variant="ghost" size="sm">
-                    <Eye />
-                  </Button>
-                </LinkedAccountDetails>
+                {useDetailPage ? (
+                  <Link href={`/linked-accounts/${account.id}`}>
+                    <Button variant="ghost" size="sm">
+                      <Eye />
+                    </Button>
+                  </Link>
+                ) : (
+                  <LinkedAccountDetails
+                    account={account}
+                    toggleAccountStatus={toggleAccountStatus}
+                  >
+                    <Button variant="ghost" size="sm">
+                      <Eye />
+                    </Button>
+                  </LinkedAccountDetails>
+                )}
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="ghost" size="sm" className="text-red-600">
@@ -207,6 +217,6 @@ export const useLinkedAccountsTableColumns = (
           enableGlobalFilter: false,
         }) as ColumnDef<LinkedAccount>,
       ].filter(Boolean) as ColumnDef<LinkedAccount>[],
-    [noAppnameColumn, toggleAccountStatus, activeProject, deleteLinkedAccount],
+    [noAppnameColumn, useDetailPage, toggleAccountStatus, activeProject, deleteLinkedAccount],
   );
 };

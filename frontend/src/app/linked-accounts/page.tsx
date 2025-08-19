@@ -45,7 +45,7 @@ export default function LinkedAccountsPage() {
   );
 
   const linkedAccountsColumns =
-    useLinkedAccountsTableColumns(toggleAccountStatus);
+    useLinkedAccountsTableColumns(toggleAccountStatus, false, true);
 
   const isPageLoading =
     isLinkedAccountsPending || isAppsPending || isConfigsPending;
