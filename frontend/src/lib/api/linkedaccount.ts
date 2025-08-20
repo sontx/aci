@@ -3,20 +3,28 @@ import axiosInstance from "@/lib/axios";
 import { AxiosError } from "axios";
 
 export async function getAllLinkedAccounts(): Promise<LinkedAccount[]> {
-  const response = await axiosInstance.get('/v1/linked-accounts');
+  const response = await axiosInstance.get("/v1/linked-accounts");
   return response.data;
 }
 
-export async function getLinkedAccount(linkedAccountId: string): Promise<LinkedAccount> {
-  const response = await axiosInstance.get(`/v1/linked-accounts/${linkedAccountId}`);
+export async function getLinkedAccount(
+  linkedAccountId: string,
+): Promise<LinkedAccount> {
+  const response = await axiosInstance.get(
+    `/v1/linked-accounts/${linkedAccountId}`,
+  );
   return response.data;
 }
 
-export async function getAppLinkedAccounts(appName: string): Promise<LinkedAccount[]> {
+export async function getAppLinkedAccounts(
+  appName: string,
+): Promise<LinkedAccount[]> {
   const params = new URLSearchParams();
   params.append("app_name", appName);
 
-  const response = await axiosInstance.get(`/v1/linked-accounts?${params.toString()}`);
+  const response = await axiosInstance.get(
+    `/v1/linked-accounts?${params.toString()}`,
+  );
   return response.data;
 }
 
@@ -42,7 +50,10 @@ export async function createAPILinkedAccount(
       requestBody.description = description;
     }
 
-    const response = await axiosInstance.post('/v1/linked-accounts/api-key', requestBody);
+    const response = await axiosInstance.post(
+      "/v1/linked-accounts/api-key",
+      requestBody,
+    );
 
     return response.data;
   } catch (error) {
@@ -72,7 +83,10 @@ export async function createNoAuthLinkedAccount(
       requestBody.description = description;
     }
 
-    const response = await axiosInstance.post('/v1/linked-accounts/no-auth', requestBody);
+    const response = await axiosInstance.post(
+      "/v1/linked-accounts/no-auth",
+      requestBody,
+    );
 
     return response.data;
   } catch (error) {
@@ -97,7 +111,7 @@ export async function getOauth2LinkURL(
 
   try {
     const response = await axiosInstance.get(
-      `/v1/linked-accounts/oauth2?${params.toString()}`
+      `/v1/linked-accounts/oauth2?${params.toString()}`,
     );
 
     if (!response.data.url || typeof response.data.url !== "string") {
@@ -112,7 +126,9 @@ export async function getOauth2LinkURL(
   }
 }
 
-export async function deleteLinkedAccount(linkedAccountId: string): Promise<void> {
+export async function deleteLinkedAccount(
+  linkedAccountId: string,
+): Promise<void> {
   await axiosInstance.delete(`/v1/linked-accounts/${linkedAccountId}`);
 }
 
@@ -132,7 +148,26 @@ export async function updateLinkedAccount(
     requestBody.description = description;
   }
 
-  const response = await axiosInstance.patch(`/v1/linked-accounts/${linkedAccountId}`, requestBody);
+  const response = await axiosInstance.patch(
+    `/v1/linked-accounts/${linkedAccountId}`,
+    requestBody,
+  );
 
+  return response.data;
+}
+
+export async function getLinkedAccountByOwnerId(
+  linkedAccountOwnerId: string,
+  appName: string,
+): Promise<LinkedAccount | null> {
+  const response = await axiosInstance.get(
+    "/v1/linked-accounts/get-by-owner-id",
+    {
+      params: {
+        owner_id: linkedAccountOwnerId,
+        app_name: appName,
+      },
+    },
+  );
   return response.data;
 }

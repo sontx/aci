@@ -10,6 +10,7 @@ import {
   deleteLinkedAccount,
   updateLinkedAccount,
   getOauth2LinkURL,
+  getLinkedAccountByOwnerId,
 } from "@/lib/api/linkedaccount";
 import { LinkedAccount } from "@/lib/types/linkedaccount";
 import { toast } from "sonner";
@@ -17,7 +18,20 @@ import { useMetaInfo } from "@/components/context/metainfo";
 
 export const linkedAccountKeys = {
   all: (projectId: string) => [projectId, "linkedaccounts"] as const,
-  detail: (projectId: string, linkedAccountId: string) => [projectId, "linkedaccounts", linkedAccountId] as const,
+  detail: (projectId: string, linkedAccountId: string) =>
+    [projectId, "linkedaccounts", linkedAccountId] as const,
+  getByOwnerId: (
+    projectId: string,
+    linkedAccountOwnerId: string,
+    appName: string,
+  ) =>
+    [
+      projectId,
+      "linkedaccounts",
+      "getByOwnerId",
+      linkedAccountOwnerId,
+      appName,
+    ] as const,
 };
 
 export const useLinkedAccounts = () => {
@@ -94,10 +108,7 @@ export const useCreateNoAuthLinkedAccount = () => {
 
   return useMutation<LinkedAccount, Error, CreateNoAuthLinkedAccountParams>({
     mutationFn: (params) =>
-      createNoAuthLinkedAccount(
-        params.appName,
-        params.linkedAccountOwnerId,
-      ),
+      createNoAuthLinkedAccount(params.appName, params.linkedAccountOwnerId),
     onSuccess: () =>
       queryClient.invalidateQueries({
         queryKey: linkedAccountKeys.all(activeProject.id),
@@ -157,10 +168,31 @@ export const useUpdateLinkedAccount = () => {
 
   return useMutation<LinkedAccount, Error, UpdateLinkedAccountParams>({
     mutationFn: (params) =>
-      updateLinkedAccount(params.linkedAccountId, params.enabled, params.description),
+      updateLinkedAccount(
+        params.linkedAccountId,
+        params.enabled,
+        params.description,
+      ),
     onSuccess: () =>
       queryClient.invalidateQueries({
         queryKey: linkedAccountKeys.all(activeProject.id),
       }),
+  });
+};
+
+export const useLinkedAccountByOwnerId = (
+  linkedAccountOwnerId?: string | null,
+  appName?: string | null,
+) => {
+  const { activeProject } = useMetaInfo();
+
+  return useQuery<LinkedAccount | null, Error>({
+    queryKey: linkedAccountKeys.getByOwnerId(
+      activeProject.id,
+      linkedAccountOwnerId!,
+      appName!,
+    ),
+    queryFn: () => getLinkedAccountByOwnerId(linkedAccountOwnerId!, appName!),
+    enabled: !!linkedAccountOwnerId && !!appName,
   });
 };

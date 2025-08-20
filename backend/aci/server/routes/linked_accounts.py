@@ -591,6 +591,36 @@ async def list_linked_accounts(
 
     return linked_accounts
 
+@router.get("/get-by-owner-id", response_model=LinkedAccountWithCredentials,
+    response_model_exclude_none=True,
+)
+async def get_linked_accounts_by_owner_id(
+    context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
+    owner_id: str = Query(description="The owner ID of the linked account"),
+    app_name: str = Query(description="The app name of the linked account"),
+) -> LinkedAccount:
+    """
+    Get a linked account by its owner ID and app name.
+    - owner_id uniquely identifies a linked account across the platform.
+    - app_name is the name of the app the linked account is associated with.
+    """
+    logger.info(f"Get linked account by owner_id, owner_id={owner_id}, app_name={app_name}")
+    linked_accounts = crud.linked_accounts.get_linked_accounts(
+        context.db_session,
+        context.project.id,
+        app_name=app_name,
+        linked_account_owner_id=owner_id,
+    )
+
+    if not linked_accounts:
+        logger.error(f"Linked account not found for owner_id={owner_id}, app_name={app_name}")
+        raise LinkedAccountNotFound(
+            f"linked account with owner_id={owner_id} and app_name={app_name} not found"
+        )
+
+    # Get the first linked account
+    return linked_accounts[0]
+
 
 @router.get(
     "/{linked_account_id}",

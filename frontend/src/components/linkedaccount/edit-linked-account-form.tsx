@@ -14,7 +14,6 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
 import {
   Form,
   FormControl,
@@ -27,6 +26,7 @@ import { LinkedAccount } from "@/lib/types/linkedaccount";
 import { useUpdateLinkedAccount } from "@/hooks/use-linked-account";
 import { toast } from "sonner";
 import { GoGear } from "react-icons/go";
+import { RichSwitch } from "../ui-extensions/rich-switch";
 
 const editFormSchema = z.object({
   description: z.string().optional(),
@@ -40,9 +40,13 @@ interface EditLinkedAccountFormProps {
   children?: React.ReactNode;
 }
 
-export function EditLinkedAccountForm({ linkedAccount, children }: EditLinkedAccountFormProps) {
+export function EditLinkedAccountForm({
+  linkedAccount,
+  children,
+}: EditLinkedAccountFormProps) {
   const [open, setOpen] = useState(false);
-  const { mutateAsync: updateLinkedAccount, isPending } = useUpdateLinkedAccount();
+  const { mutateAsync: updateLinkedAccount, isPending } =
+    useUpdateLinkedAccount();
 
   const form = useForm<EditFormValues>({
     resolver: zodResolver(editFormSchema),
@@ -103,10 +107,10 @@ export function EditLinkedAccountForm({ linkedAccount, children }: EditLinkedAcc
                 <FormItem>
                   <FormLabel>Description (Optional)</FormLabel>
                   <FormControl>
-                    <Textarea 
-                      placeholder="Description for this linked account" 
+                    <Textarea
+                      placeholder="Description for this linked account"
                       className="min-h-[80px] resize-none"
-                      {...field} 
+                      {...field}
                     />
                   </FormControl>
                   <FormMessage />
@@ -118,17 +122,13 @@ export function EditLinkedAccountForm({ linkedAccount, children }: EditLinkedAcc
               control={form.control}
               name="enabled"
               render={({ field }) => (
-                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                  <div className="space-y-0.5">
-                    <FormLabel className="text-base">Account Status</FormLabel>
-                    <div className="text-sm text-muted-foreground">
-                      Enable or disable this linked account
-                    </div>
-                  </div>
+                <FormItem className="flex flex-row items-center rounded-lg border p-4">
                   <FormControl>
-                    <Switch
+                    <RichSwitch
                       checked={field.value}
                       onCheckedChange={field.onChange}
+                      label="Account Status"
+                      description="Enable or disable this linked account"
                     />
                   </FormControl>
                 </FormItem>

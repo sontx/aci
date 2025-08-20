@@ -19,6 +19,8 @@ import { RouterLink } from "../ui-extensions/router-link";
 import { formatToLocalTime } from "@/utils/time";
 import { AppItemDisplay } from "../apps/app-item-display";
 import { generateFunctionDisplayName } from "@/utils/string";
+import { useRouter } from "next/navigation";
+import { useLinkedAccountByOwnerId } from "@/hooks/use-linked-account";
 
 interface LogDetailSheetProps {
   selectedLogEntry: ExecutionLog | null;
@@ -35,6 +37,11 @@ export function LogDetailSheet({
   const { data: logDetails, isLoading } = useExecutionLogDetails(
     selectedLogEntry?.id || "",
   );
+  const router = useRouter();
+  const { data: linkedAccount } = useLinkedAccountByOwnerId(
+    logDetails?.linked_account_owner_id,
+    logDetails?.app_name,
+  );
 
   if (!selectedLogEntry) return null;
 
@@ -45,6 +52,11 @@ export function LogDetailSheet({
     } catch {
       return String(data);
     }
+  };
+
+  const viewLinkedAccount = () => {
+    if (!linkedAccount) return;
+    router.push(`/linked-accounts/${linkedAccount.id}`);
   };
 
   return (
@@ -151,7 +163,12 @@ export function LogDetailSheet({
                   Account Owner ID
                 </label>
                 <p className="font-mono text-sm">
-                  {selectedLogEntry.linked_account_owner_id || "-"}
+                  <a
+                    onClick={viewLinkedAccount}
+                    className="cursor-pointer hover:text-blue-600 hover:underline"
+                  >
+                    {selectedLogEntry.linked_account_owner_id || "-"}
+                  </a>
                 </p>
               </div>
             </div>
