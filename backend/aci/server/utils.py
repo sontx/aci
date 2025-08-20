@@ -70,6 +70,7 @@ def format_function_definition(
             return BasicFunctionDefinition(
                 name=function.name,
                 description=function.description,
+                active=function.active,
                 tags=function.tags,
                 display_name=generate_display_name(app_name=function.app_name, function_name=function.name),
             )

@@ -87,7 +87,7 @@ export const useUserAppFunctionsColumns = (): ColumnDef<AppFunction>[] => {
             variant={info.getValue() ? "default" : "destructive"}
             className="text-nowrap"
           >
-            {info.getValue() ? "Yes" : "No"}
+            {info.getValue() ? "Active" : "Inactive"}
           </Badge>
         ),
       }),

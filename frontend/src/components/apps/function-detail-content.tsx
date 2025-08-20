@@ -81,14 +81,14 @@ export function FunctionDetailContent({
             <div>
               <h1 className="text-2xl font-bold">{func.display_name}</h1>
               {func.tags?.length > 0 && (
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 mt-0.5">
                   {func.tags?.map((tag: string) => (
                     <Badge key={tag} variant="normal" className="capitalize">
                       {tag}
                     </Badge>
                   ))}
                   {!func.active && (
-                    <Badge variant="destructive">Disabled</Badge>
+                    <Badge variant="destructive">Inactive</Badge>
                   )}
                 </div>
               )}

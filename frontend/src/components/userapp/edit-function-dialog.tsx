@@ -32,7 +32,7 @@ import { MultiSelect, Option } from "@/components/ui-extensions/multi-select";
 import { toast } from "sonner";
 
 const editFunctionSchema = z.object({
-  description: z.string().min(1, "Description is required"),
+  description: z.string().optional(),
   tags: z.array(z.string()).default([]),
   active: z.boolean().default(true),
 });

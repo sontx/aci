@@ -234,6 +234,7 @@ class BasicFunctionDefinition(BaseModel):
     name: str
     description: str
     display_name: str
+    active: bool
     tags: list[str] | None
 
 
