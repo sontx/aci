@@ -11,7 +11,7 @@ from aci.common.schemas.common import Paged
 from aci.common.schemas.execution_log import (
     ExecutionLogResponse,
     ExecutionDetailResponse,
-    ExecutionLogWithDetailResponse,
+    ExecutionLogWithDetailResponse, ExecutionLogsStatistics,
 )
 from aci.server.dependencies import get_request_context, RequestContext
 
@@ -109,6 +109,67 @@ async def get_execution_logs(
     ]
 
     return Paged(total=total_count, items=log_responses)
+
+
+# Statistics by max/min execution time, average execution time, total failures/successes
+# This could be filtered by app_name, function_name, linked_account_owner_id or none of them
+@router.get("/statistics", response_model=ExecutionLogsStatistics)
+async def get_execution_logs_statistics(
+    context: Annotated[RequestContext, Depends(get_request_context)],
+    start_time: datetime | None = Query(
+        default=None,
+        description="Filter logs after this time (ISO format)"
+    ),
+    end_time: datetime | None = Query(
+        default=None,
+        description="Filter logs before this time (ISO format)"
+    ),
+    app_name: str | None = Query(
+        default=None,
+        description="Filter logs by app name"
+    ),
+    function_name: str | None = Query(
+        default=None,
+        description="Filter logs by function name"
+    ),
+    app_configuration_id: UUID | None = Query(
+        default=None,
+        description="Filter logs by app configuration ID"
+    ),
+    linked_account_owner_id: str | None = Query(
+        default=None,
+        description="Filter logs by linked account owner ID"
+    ),
+) -> ExecutionLogsStatistics:
+    """
+    Get statistics for execution logs filtered by project and optional query parameters.
+    """
+    logger.debug(
+        f"Getting execution logs statistics for project_id={context.project.id}, "
+        f"start_time={start_time}, end_time={end_time}, "
+        f"app_name={app_name}, function_name={function_name}"
+    )
+
+    # Get the statistics
+    stats = crud.execution_logs.get_execution_logs_statistics(
+        db_session=context.db_session,
+        project_id=context.project.id,
+        start_time=start_time,
+        end_time=end_time,
+        app_name=app_name,
+        function_name=function_name,
+        app_configuration_id=app_configuration_id,
+        linked_account_owner_id=linked_account_owner_id,
+    )
+
+    return ExecutionLogsStatistics(
+        total_count=stats.total_count,
+        success_count=stats.success_count,
+        failure_count=stats.failure_count,
+        average_execution_time=stats.average_execution_time,
+        min_execution_time=stats.min_execution_time,
+        max_execution_time=stats.max_execution_time,
+    )
 
 
 @router.get("/{log_id}", response_model=ExecutionLogWithDetailResponse)

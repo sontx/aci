@@ -195,7 +195,7 @@ export function DatePickerWithRange({
 
   return (
     <div
-      className={cn("my-3 flex flex-col-reverse gap-2 md:flex-row", className)}
+      className={cn("flex flex-col-reverse gap-2 md:flex-row", className)}
     >
       <DashboardDateRangeDropdown
         selectedOption={selectedOption}

@@ -18,7 +18,7 @@ export default function LogsPage() {
       <Separator />
 
       <div className="m-4">
-        <LogsView />
+        <LogsView showStatistics={true} />
       </div>
     </div>
   );

@@ -25,19 +25,17 @@ export function LogsTableView({
   }
 
   return (
-    <div className="rounded-md py-4">
-      <div className="overflow-x-auto w-full">
-        <EnhancedDataTable
-          columns={columns}
-          data={logs}
-          defaultSorting={[{ id: "created_at", desc: true }]}
-          loading={isLoading}
-          paginationOptions={{
-            initialPageIndex: 0,
-            initialPageSize: 10,
-          }}
-        />
-      </div>
+    <div className="overflow-x-auto w-full">
+      <EnhancedDataTable
+        columns={columns}
+        data={logs}
+        defaultSorting={[{ id: "created_at", desc: true }]}
+        loading={isLoading}
+        paginationOptions={{
+          initialPageIndex: 0,
+          initialPageSize: 10,
+        }}
+      />
     </div>
   );
 }

@@ -39,7 +39,7 @@ export function LogsDateFilter({
       />
       <Button
         onClick={onRefresh}
-        variant="default"
+        variant="outline"
         size="sm"
         className="gap-2"
         disabled={isLoading}

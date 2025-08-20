@@ -1,6 +1,7 @@
 import {
   ExecutionDetail,
   ExecutionLog,
+  ExecutionLogsStatistics,
   LogSearchParams,
   LogSearchResponse,
 } from "@/lib/types/log";
@@ -52,5 +53,23 @@ export async function getExecutionLogDetail(
   logId: string,
 ): Promise<ExecutionLogWithDetail> {
   const response = await axiosInstance.get(`/v1/execution-logs/${logId}`);
+  return response.data;
+}
+
+export interface ExecutionLogStatisticsParams {
+  start_time?: string;
+  end_time?: string;
+  app_name?: string;
+  function_name?: string;
+  app_configuration_id?: string;
+  linked_account_owner_id?: string;
+}
+
+export async function getExecutionLogsStatistics(
+  params: ExecutionLogStatisticsParams,
+): Promise<ExecutionLogsStatistics> {
+  const response = await axiosInstance.get('/v1/execution-logs/statistics', {
+    params,
+  });
   return response.data;
 }

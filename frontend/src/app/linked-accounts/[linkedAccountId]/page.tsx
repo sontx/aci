@@ -137,11 +137,11 @@ export default function LinkedAccountDetailPage() {
           <TabsTrigger value="logs">Execution Logs</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="details">
+        <TabsContent value="details" className="pt-4">
           <LinkedAccountOverview linkedAccount={linkedAccount} />
         </TabsContent>
 
-        <TabsContent value="logs">
+        <TabsContent value="logs" className="pt-4">
           <LogsView
             linkedAccountOwnerId={linkedAccount.linked_account_owner_id}
           />

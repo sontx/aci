@@ -227,7 +227,7 @@ export default function AppConfigDetailPage() {
           />
         </TabsContent>
 
-        <TabsContent value="logs">
+        <TabsContent value="logs" className="pt-4">
           <LogsView appConfigId={appConfig?.id} />
         </TabsContent>
 

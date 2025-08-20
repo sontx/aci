@@ -41,3 +41,15 @@ class ExecutionLogQueryParams(BaseModel):
     function_name: str | None = Field(default=None, description="Filter logs by function name")
     limit: int = Field(default=100, ge=1, le=1000, description="Number of logs to return")
     offset: int = Field(default=0, ge=0, description="Number of logs to skip")
+
+
+class ExecutionLogsStatistics(BaseModel):
+    """Statistics for execution logs"""
+    total_count: int = Field(description="Total number of execution logs")
+    success_count: int = Field(description="Number of successful executions")
+    failure_count: int = Field(description="Number of failed executions")
+    average_execution_time: float = Field(
+        description="Average execution time in milliseconds"
+    )
+    min_execution_time: float = Field(description="Minimum execution time in milliseconds")
+    max_execution_time: float = Field(description="Maximum execution time in milliseconds")

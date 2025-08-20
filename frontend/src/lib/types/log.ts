@@ -63,3 +63,12 @@ export enum ExecutionStatus {
   SUCCESS = "success",
   FAILED = "failed",
 }
+
+export interface ExecutionLogsStatistics {
+  total_count: number;
+  success_count: number;
+  failure_count: number;
+  average_execution_time: number;
+  min_execution_time: number;
+  max_execution_time: number;
+}
