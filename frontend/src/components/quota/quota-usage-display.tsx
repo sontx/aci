@@ -1,8 +1,10 @@
 "use client";
 
 import { QuotaUsage } from "@/lib/types/quota";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import React from "react";
 
 interface QuotaUsageDisplayProps {
@@ -55,30 +57,36 @@ export const QuotaUsageDisplay: React.FC<QuotaUsageDisplayProps> = ({
   quotaUsage,
 }) => {
   return (
-    <div className="space-y-6">
-      <QuotaItem
-        title="Projects"
-        used={quotaUsage.projects_used}
-        limit={quotaUsage.plan.features.projects}
-      />
+    <Card className="flex flex-col h-full">
+      <CardHeader className="flex flex-row items-center justify-between p-4">
+        <CardTitle>Quota Usage</CardTitle>
+      </CardHeader>
+      <Separator />
+      <CardContent className="p-4 space-y-6">
+        <QuotaItem
+          title="Projects"
+          used={quotaUsage.projects_used}
+          limit={quotaUsage.plan.features.projects}
+        />
 
-      <QuotaItem
-        title="Unique Linked Account Owner Ids"
-        used={quotaUsage.linked_accounts_used}
-        limit={quotaUsage.plan.features.linked_accounts}
-      />
+        <QuotaItem
+          title="Unique Linked Account Owner Ids"
+          used={quotaUsage.linked_accounts_used}
+          limit={quotaUsage.plan.features.linked_accounts}
+        />
 
-      <QuotaItem
-        title="Agent Credentials"
-        used={quotaUsage.agent_credentials_used}
-        limit={quotaUsage.plan.features.agent_credentials}
-      />
+        <QuotaItem
+          title="Agent Credentials"
+          used={quotaUsage.agent_credentials_used}
+          limit={quotaUsage.plan.features.agent_credentials}
+        />
 
-      <QuotaItem
-        title="API Calls (Across All Projects,Reset Monthly)"
-        used={quotaUsage.api_calls_used}
-        limit={quotaUsage.plan.features.api_calls_monthly}
-      />
-    </div>
+        <QuotaItem
+          title="API Calls (Across All Projects,Reset Monthly)"
+          used={quotaUsage.api_calls_used}
+          limit={quotaUsage.plan.features.api_calls_monthly}
+        />
+      </CardContent>
+    </Card>
   );
 };

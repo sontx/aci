@@ -3,23 +3,14 @@
 import { useQueries, UseQueryResult } from "@tanstack/react-query";
 import { useMetaInfo } from "@/components/context/metainfo";
 import {
-  getAppDistributionData,
-  getFunctionDistributionData,
   getAppTimeSeriesData,
   getFunctionTimeSeriesData,
 } from "@/lib/api/analytics";
-import {
-  DistributionDatapoint,
-  TimeSeriesDatapoint,
-} from "@/lib/types/analytics";
+import { TimeSeriesDatapoint } from "@/lib/types/analytics";
 
 export const analyticsKeys = {
   // Since it is not a data source of an interface, in order to unify the usage of all APIs, use base
   base: (projectId: string) => ["analytics", projectId] as const,
-  appDistribution: (projectId: string) =>
-    [...analyticsKeys.base(projectId), "app-distribution"] as const,
-  functionDistribution: (projectId: string) =>
-    [...analyticsKeys.base(projectId), "function-distribution"] as const,
   appTimeSeries: (projectId: string) =>
     [...analyticsKeys.base(projectId), "app-time-series"] as const,
   functionTimeSeries: (projectId: string) =>
@@ -31,18 +22,6 @@ export function useAnalyticsQueries() {
 
   const results = useQueries({
     queries: [
-      {
-        queryKey: analyticsKeys.appDistribution(activeProject.id),
-        queryFn: () => getAppDistributionData(),
-        enabled: !!activeProject,
-        staleTime: 0,
-      },
-      {
-        queryKey: analyticsKeys.functionDistribution(activeProject.id),
-        queryFn: () => getFunctionDistributionData(),
-        enabled: !!activeProject,
-        staleTime: 0,
-      },
       {
         queryKey: analyticsKeys.appTimeSeries(activeProject.id),
         queryFn: () => getAppTimeSeriesData(),
@@ -58,21 +37,12 @@ export function useAnalyticsQueries() {
     ],
   });
 
-  const [
-    appDistributionQuery,
-    functionDistributionQuery,
-    appTimeSeriesQuery,
-    functionTimeSeriesQuery,
-  ] = results as [
-    UseQueryResult<DistributionDatapoint[], Error>,
-    UseQueryResult<DistributionDatapoint[], Error>,
+  const [appTimeSeriesQuery, functionTimeSeriesQuery] = results as [
     UseQueryResult<TimeSeriesDatapoint[], Error>,
     UseQueryResult<TimeSeriesDatapoint[], Error>,
   ];
 
   return {
-    appDistributionData: appDistributionQuery.data ?? [],
-    functionDistributionData: functionDistributionQuery.data ?? [],
     appTimeSeriesData: appTimeSeriesQuery.data ?? [],
     functionTimeSeriesData: functionTimeSeriesQuery.data ?? [],
     isLoading: results.some((query) => query.isLoading),

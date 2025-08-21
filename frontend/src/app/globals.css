@@ -27,11 +27,16 @@ body {
     --border: 0 0% 89.8%;
     --input: 0 0% 89.8%;
     --ring: 0 0% 3.9%;
-    --chart-1: 221.2 83.2% 53.3%;
-    --chart-2: 212 95% 68%;
-    --chart-3: 216 92% 60%;
-    --chart-4: 210 98% 78%;
-    --chart-5: 212 97% 87%;
+    --chart-1: 210 80% 45%;   /* Blue */
+    --chart-2: 25 85% 50%;    /* Orange */
+    --chart-3: 140 60% 35%;   /* Green */
+    --chart-4: 0 70% 50%;     /* Red */
+    --chart-5: 270 65% 55%;   /* Purple */
+    --chart-6: 50 85% 45%;    /* Gold/Yellow */
+    --chart-7: 190 70% 40%;   /* Teal */
+    --chart-8: 330 65% 50%;   /* Magenta */
+    --chart-9: 110 50% 35%;   /* Olive */
+    --chart-10: 20 65% 40%;   /* Brown */
     --radius: 0.5rem;
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
@@ -62,11 +67,16 @@ body {
     --border: 0 0% 14.9%;
     --input: 0 0% 14.9%;
     --ring: 0 0% 83.1%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
+    --chart-1: 210 70% 65%;   /* Blue */
+    --chart-2: 25 75% 65%;    /* Orange */
+    --chart-3: 140 55% 55%;   /* Green */
+    --chart-4: 0 65% 65%;     /* Red */
+    --chart-5: 270 55% 70%;   /* Purple */
+    --chart-6: 50 75% 65%;    /* Gold/Yellow */
+    --chart-7: 190 60% 60%;   /* Teal */
+    --chart-8: 330 55% 65%;   /* Magenta */
+    --chart-9: 110 45% 55%;   /* Olive */
+    --chart-10: 20 55% 60%;   /* Brown */
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;

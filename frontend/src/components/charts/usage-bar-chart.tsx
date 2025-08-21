@@ -46,7 +46,7 @@ export function UsageBarChart({ title, data }: UsageBarChartProps) {
         app,
         {
           label: app,
-          color: `hsl(var(--chart-${(index % 5) + 1}))`,
+          color: `hsl(var(--chart-${(index % 10) + 1}))`,
         },
       ]),
     ),
