@@ -28,6 +28,7 @@ def configure_cache_from_env():
                 "port": redis_port,
                 "db": redis_db,
                 "timeout": 1,
+                "serializer": {"class": "aiocache.serializers.JsonSerializer"},
                 **common_kwargs,
             }
         }

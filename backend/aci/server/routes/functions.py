@@ -174,6 +174,7 @@ async def get_function_definition(
     "/{function_name}/execute",
     response_model=FunctionExecutionResult,
     response_model_exclude_none=True,
+    dependencies=[Depends(deps.validate_monthly_quota)],
 )
 async def execute(
         context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],

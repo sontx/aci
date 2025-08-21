@@ -14,7 +14,6 @@ import { IoMdCheckmark } from "react-icons/io";
 import { Interval } from "@/lib/types/billing";
 import { useSubscription } from "@/hooks/use-subscription";
 import { createCheckoutSession } from "@/lib/api/billing";
-import { useMetaInfo } from "@/components/context/metainfo";
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { useRouter } from "next/navigation";

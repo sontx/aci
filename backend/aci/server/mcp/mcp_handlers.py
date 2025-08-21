@@ -32,6 +32,7 @@ from aci.server import security_credentials_manager as scm
 from aci.server.context import request_id_ctx_var
 from aci.server.execution_logs.execution_log_appender import log_appender
 from aci.server.function_executors import get_executor
+from aci.server.quota_service import consume_monthly_quota
 from aci.server.security_credentials_manager import SecurityCredentialsResponse
 
 logger = get_logger(__name__)
@@ -128,6 +129,8 @@ class MCPAppServer:
             context = mcp_request_ctx_var.get()
             start = time.perf_counter()
             created_at = datetime.now(UTC)
+
+            await consume_monthly_quota(context.db_session, self.project_id, 1)
 
             function, result = await execute_function(
                 db_session=context.db_session,

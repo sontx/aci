@@ -15,7 +15,7 @@ for example,
 # TODO: ideally shouldn't need it in python 3.12 for forward reference?
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, date
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -28,7 +28,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
-    text, Index, )
+    text, Index, BigInteger, Date, )
 from sqlalchemy import Enum as SqlEnum
 # Note: need to use postgresqlr ARRAY in order to use overlap operator
 from sqlalchemy.dialects.postgresql import ARRAY, BYTEA, JSONB
@@ -82,22 +82,13 @@ class Project(Base):
     visibility_access: Mapped[Visibility] = mapped_column(SqlEnum(Visibility), nullable=False)
 
     """ quota related fields: TODO: TBD how to implement quota system """
-    daily_quota_used: Mapped[int] = mapped_column(Integer, default=0, nullable=False, init=False)
-    daily_quota_reset_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=False), server_default=func.now(), nullable=False, init=False
-    )
-    api_quota_monthly_used: Mapped[int] = mapped_column(
-        Integer, server_default="0", nullable=False, init=False
-    )
-    api_quota_last_reset: Mapped[datetime] = mapped_column(
-        DateTime(timezone=False),
-        # set default to first day of the current month
-        # TODO: date_trunc('month', now()) breaks on SQLite & MySQL
-        server_default=text("date_trunc('month', now())"),
-        nullable=False,
-        init=False,
-    )
-    total_quota_used: Mapped[int] = mapped_column(Integer, default=0, nullable=False, init=False)
+    # First day of the month in which `monthly_quota_used` applies (e.g., 2025-08-01)
+    monthly_quota_month: Mapped[date] = mapped_column(Date, nullable=True)
+    # Hard monthly cap (must be >= 0)
+    monthly_quota_limit: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    # Usage in the current tracked month (reset when month rolls)
+    monthly_quota_used: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    total_quota_used: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=False), server_default=func.now(), nullable=False, init=False

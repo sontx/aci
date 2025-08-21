@@ -1,4 +1,5 @@
-from datetime import datetime
+from datetime import datetime, date
+from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -26,10 +27,9 @@ class ProjectPublic(BaseModel):
     org_id: UUID
     name: str
     visibility_access: Visibility
-    daily_quota_used: int
-    daily_quota_reset_at: datetime
-    api_quota_monthly_used: int
-    api_quota_last_reset: datetime
+    monthly_quota_month: Optional[date]
+    monthly_quota_limit: int
+    monthly_quota_used: int
     total_quota_used: int
 
     created_at: datetime
