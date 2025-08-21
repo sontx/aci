@@ -89,7 +89,7 @@ export function LogStatistics({ params }: LogStatisticsProps) {
       </span>
     ),
     none: (
-      <span className="text-green-500">Everything is running smoothly.</span>
+      statistics.total_count > 0 && <span className="text-green-500">Everything is running smoothly</span>
     ),
   }[failedWarningLevel];
 
