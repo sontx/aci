@@ -35,6 +35,7 @@ PART_REST = f"{PARENT_TABLE}_rest"
 CHILD_INDEXES = [
     ("ix_execution_logs_project_id", ("project_id",)),
     ("ix_execution_logs_project_id_app_config_id", ("project_id", "app_configuration_id")),
+    ("ix_execution_logs_project_id_api_key_name", ("project_id", "api_key_name")),
     ("ix_execution_logs_project_id_linked_account_id", ("project_id", "linked_account_owner_id")),
     ("ix_execution_logs_project_id_app_name", ("project_id", "app_name")),
     ("ix_execution_logs_project_id_function_name", ("project_id", "function_name")),

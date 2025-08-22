@@ -13,11 +13,6 @@ export const Header = () => {
     <div>
       <div className="flex w-full items-center justify-between px-4 py-2 h-12">
         <BreadcrumbLinks pathname={pathname} />
-
-        {/* <Input
-          placeholder="Search keyword, category, etc."
-          className="mx-2 w-80"
-        /> */}
       </div>
       <Separator />
     </div>

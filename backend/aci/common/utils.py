@@ -127,6 +127,20 @@ def random_string(length: int = 10) -> str:
     return ''.join(random.choice(letters) for _ in range(length))
 
 
+def generate_api_key() -> str:
+    """
+    Generate a secure API key.
+    Format: api_<32_random_characters>
+    """
+    import secrets
+    import string
+
+    # Use cryptographically secure random generator
+    alphabet = string.ascii_letters + string.digits
+    random_part = ''.join(secrets.choice(alphabet) for _ in range(32))
+    return f"api_{random_part}"
+
+
 def is_uuid(value: str | UUID) -> bool:
     if isinstance(value, UUID):
         return True

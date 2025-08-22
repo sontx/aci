@@ -1,8 +1,8 @@
 from datetime import datetime
-from uuid import UUID
 from typing import Optional
+from uuid import UUID
 
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, Select, func
 from sqlalchemy.orm import Session
 
 from aci.common.db.sql_models import ExecutionLog, ExecutionDetail
@@ -12,30 +12,85 @@ logger = get_logger(__name__)
 
 
 def get_execution_logs(
-    db_session: Session,
-    project_id: UUID,
-    start_time: Optional[datetime] = None,
-    end_time: Optional[datetime] = None,
-    app_name: Optional[str] = None,
-    function_name: Optional[str] = None,
-    app_configuration_id: UUID | None = None,
-    linked_account_owner_id: str | None = None,
-    limit: int = 100,
-    offset: int = 0,
+        db_session: Session,
+        project_id: UUID,
+        start_time: Optional[datetime] = None,
+        end_time: Optional[datetime] = None,
+        app_name: Optional[str] = None,
+        function_name: Optional[str] = None,
+        app_configuration_id: UUID | None = None,
+        linked_account_owner_id: str | None = None,
+        api_key_name: Optional[str] = None,
+        limit: int = 100,
+        offset: int = 0,
 ) -> list[ExecutionLog]:
     """
     Get execution logs filtered by project_id and optional filters.
     """
-    logger.debug(
-        f"Getting execution logs for project_id={project_id}, "
-        f"start_time={start_time}, end_time={end_time}, "
-        f"app_name={app_name}, function_name={function_name}, "
-        f"limit={limit}, offset={offset}"
+    statement = select(ExecutionLog).filter(ExecutionLog.project_id == project_id)
+    statement = _build_execution_log_query(
+        statement,
+        start_time=start_time,
+        end_time=end_time,
+        app_name=app_name,
+        function_name=function_name,
+        app_configuration_id=app_configuration_id,
+        linked_account_owner_id=linked_account_owner_id,
+        api_key_name=api_key_name,
     )
 
-    statement = select(ExecutionLog).filter(ExecutionLog.project_id == project_id)
+    # Order by created_at descending (most recent first)
+    statement = statement.order_by(ExecutionLog.created_at.desc())
 
-    # Apply optional filters
+    # Apply pagination
+    statement = statement.offset(offset).limit(limit)
+
+    return list(db_session.execute(statement).scalars().all())
+
+
+def count_execution_logs(
+        db_session: Session,
+        project_id: UUID,
+        start_time: Optional[datetime] = None,
+        end_time: Optional[datetime] = None,
+        app_name: Optional[str] = None,
+        function_name: Optional[str] = None,
+        app_configuration_id: UUID | None = None,
+        linked_account_owner_id: str | None = None,
+        api_key_name: Optional[str] = None,
+) -> int:
+    """
+    Count execution logs filtered by project_id and optional filters.
+    """
+    statement = select(func.count(ExecutionLog.id)).filter(ExecutionLog.project_id == project_id)
+    statement = _build_execution_log_query(
+        statement,
+        start_time=start_time,
+        end_time=end_time,
+        app_name=app_name,
+        function_name=function_name,
+        app_configuration_id=app_configuration_id,
+        linked_account_owner_id=linked_account_owner_id,
+        api_key_name=api_key_name,
+    )
+
+    return db_session.execute(statement).scalar() or 0
+
+
+def _build_execution_log_query(
+        statement: Select[tuple[ExecutionLog]],
+        start_time: Optional[datetime] = None,
+        end_time: Optional[datetime] = None,
+        app_name: Optional[str] = None,
+        function_name: Optional[str] = None,
+        app_configuration_id: UUID | None = None,
+        linked_account_owner_id: str | None = None,
+        api_key_name: Optional[str] = None,
+) -> Select[tuple[ExecutionLog]]:
+    """
+    Build the base query for execution logs with optional filters.
+    This is a helper function to avoid code duplication.
+    """
     if start_time:
         statement = statement.filter(ExecutionLog.created_at >= start_time)
 
@@ -54,50 +109,16 @@ def get_execution_logs(
     if linked_account_owner_id:
         statement = statement.filter(ExecutionLog.linked_account_owner_id == linked_account_owner_id)
 
-    # Order by created_at descending (most recent first)
-    statement = statement.order_by(ExecutionLog.created_at.desc())
+    if api_key_name:
+        statement = statement.filter(ExecutionLog.api_key_name == api_key_name)
 
-    # Apply pagination
-    statement = statement.offset(offset).limit(limit)
-
-    return list(db_session.execute(statement).scalars().all())
-
-
-def count_execution_logs(
-    db_session: Session,
-    project_id: UUID,
-    start_time: Optional[datetime] = None,
-    end_time: Optional[datetime] = None,
-    app_name: Optional[str] = None,
-    function_name: Optional[str] = None,
-) -> int:
-    """
-    Count execution logs filtered by project_id and optional filters.
-    """
-    from sqlalchemy import func
-
-    statement = select(func.count(ExecutionLog.id)).filter(ExecutionLog.project_id == project_id)
-
-    # Apply same filters as get_execution_logs
-    if start_time:
-        statement = statement.filter(ExecutionLog.created_at >= start_time)
-
-    if end_time:
-        statement = statement.filter(ExecutionLog.created_at <= end_time)
-
-    if app_name:
-        statement = statement.filter(ExecutionLog.app_name == app_name)
-
-    if function_name:
-        statement = statement.filter(ExecutionLog.function_name == function_name)
-
-    return db_session.execute(statement).scalar() or 0
+    return statement
 
 
 def get_execution_log_by_id(
-    db_session: Session,
-    log_id: UUID,
-    project_id: UUID,
+        db_session: Session,
+        log_id: UUID,
+        project_id: UUID,
 ) -> ExecutionLog | None:
     """
     Get a specific execution log by ID, ensuring it belongs to the project.
@@ -115,8 +136,8 @@ def get_execution_log_by_id(
 
 
 def get_execution_detail_by_id(
-    db_session: Session,
-    log_id: UUID,
+        db_session: Session,
+        log_id: UUID,
 ) -> ExecutionDetail | None:
     """
     Get execution detail by log ID.

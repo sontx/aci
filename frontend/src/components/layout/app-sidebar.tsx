@@ -27,6 +27,7 @@ import {
   RiFileList3Line,
   RiLinkUnlinkM,
   RiSettings3Line,
+  RiKey2Line,
 } from "react-icons/ri";
 import { HiOutlineServer } from "react-icons/hi2";
 
@@ -67,6 +68,11 @@ export const sidebarItems = [
     title: "MCP Servers",
     url: `/mcp-servers`,
     icon: HiOutlineServer,
+  },
+  {
+    title: "API Keys",
+    url: `/api-keys`,
+    icon: RiKey2Line,
   },
   ...(showLogDashboard
     ? [

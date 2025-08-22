@@ -27,7 +27,7 @@ class MCPServerResponse(BaseModel):
     mcp_link: str | None
     created_at: datetime
     updated_at: datetime
-    last_used_at: datetime
+    last_used_at: datetime | None
 
 
 class MCPServerListQuery(BaseModel):

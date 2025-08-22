@@ -484,3 +484,16 @@ class ExecutionLogNotFound(ACIException):
             message=message,
             error_code=status.HTTP_404_NOT_FOUND,
         )
+
+
+class APIKeyNotFound(ACIException):
+    """
+    Exception raised when an API key is not found
+    """
+
+    def __init__(self, message: str | None = None):
+        super().__init__(
+            title="API key not found",
+            message=message,
+            error_code=status.HTTP_404_NOT_FOUND,
+        )

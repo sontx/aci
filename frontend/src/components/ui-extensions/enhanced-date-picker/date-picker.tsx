@@ -208,7 +208,7 @@ export function DatePickerWithRange({
             id="date"
             variant={"outline"}
             className={cn(
-              "justify-start text-left font-normal",
+              "justify-start text-left font-normal hidden md:flex",
               !internalDateRange && "text-muted-foreground",
             )}
           >

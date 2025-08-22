@@ -39,7 +39,6 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, MappedAsDataclass, mapped_co
 from aci.common.db.custom_sql_types import (
     EncryptedSecurityCredentials,
     EncryptedSecurityScheme,
-    Key,
 )
 from aci.common.enums import (
     APIKeyStatus,
@@ -121,8 +120,10 @@ class APIKey(Base):
     id: Mapped[UUID] = mapped_column(
         PGUUID(as_uuid=True), primary_key=True, default_factory=uuid4, init=False
     )
-    # "key" is the encrypted actual API key string that the user will use to authenticate
-    key: Mapped[str] = mapped_column(Key(), nullable=False, unique=True)
+    # User-defined name for the API key, unique within a project
+    name: Mapped[str] = mapped_column(String(MAX_STRING_LENGTH), nullable=False)
+    # "key" is just first 10 characters of the actual API key for logging and display purposes.
+    key: Mapped[str] = mapped_column(String(MAX_STRING_LENGTH), nullable=False)
     key_hmac: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
     project_id: Mapped[UUID] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("projects.id"), nullable=False
@@ -141,6 +142,11 @@ class APIKey(Base):
     )
 
     project: Mapped[Project] = relationship("Project", lazy="select", init=False)
+
+    # unique constraint: name is unique within a project
+    __table_args__ = (
+        UniqueConstraint("project_id", "name", name="uc_project_api_key_name"),
+    )
 
 
 # TODO: how to do versioning for app and funcitons to allow backward compatibility, or we don't actually need to
@@ -589,6 +595,7 @@ class ExecutionLog(Base):
     app_name: Mapped[str] = mapped_column(String(APP_NAME_MAX_LENGTH), nullable=False)
     linked_account_owner_id: Mapped[str] = mapped_column(String(MAX_STRING_LENGTH), nullable=True)
     app_configuration_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=True)
+    api_key_name: Mapped[str] = mapped_column(String(MAX_STRING_LENGTH), nullable=True)
     status: Mapped[ExecutionStatus] = mapped_column(SqlEnum(ExecutionStatus), nullable=False)
     execution_time: Mapped[int] = mapped_column(Integer, nullable=False)  # in milliseconds
     created_at: Mapped[datetime] = mapped_column(

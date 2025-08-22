@@ -77,6 +77,7 @@ ROUTER_PREFIX_BILLING = "/v1/billing"
 ROUTER_PREFIX_ORGANIZATIONS = "/v1/organizations"
 ROUTER_PREFIX_MCP_SERVERS = "/v1/mcp-servers"
 ROUTER_PREFIX_EXECUTION_LOGS = "/v1/execution-logs"
+ROUTER_PREFIX_API_KEYS = "/v1/api-keys"
 
 # DEV PORTAL
 DEV_PORTAL_URL = check_and_get_env_variable("SERVER_DEV_PORTAL_URL")

@@ -11,9 +11,11 @@ import { ExecutionLogSearchParams } from "@/lib/api/log";
 export function useLogsTable({
   appConfigId,
   linkedAccountOwnerId,
+  apiKeyName,
 }: {
   appConfigId?: string;
   linkedAccountOwnerId?: string;
+  apiKeyName?: string;
 }) {
   const [selectedLogEntry, setSelectedLogEntry] = useState<ExecutionLog | null>(
     null,
@@ -42,6 +44,7 @@ export function useLogsTable({
     }),
     app_configuration_id: appConfigId,
     linked_account_owner_id: linkedAccountOwnerId,
+    api_key_name: apiKeyName,
   };
 
   // Use the new execution logs hook

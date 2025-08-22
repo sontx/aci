@@ -1,4 +1,5 @@
 from . import (
+    api_keys,
     app_configurations,
     apps,
     execution_logs,
@@ -13,6 +14,7 @@ from . import (
 )
 
 __all__ = [
+    "api_keys",
     "app_configurations",
     "apps",
     "execution_logs",

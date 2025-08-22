@@ -44,7 +44,7 @@ export const BreadcrumbLinks = ({ pathname }: BreadcrumbLinksProps) => {
 
     breadcrumbsList.push(
       <BreadcrumbItem key={i * 2}>
-        <Link href={breadcrumbs[i].href}>{breadcrumbs[i].label}</Link>
+        <Link href={breadcrumbs[i].href}>{decodeURIComponent(breadcrumbs[i].label)}</Link>
       </BreadcrumbItem>,
     );
   }

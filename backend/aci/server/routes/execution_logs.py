@@ -46,6 +46,10 @@ async def get_execution_logs(
         default=None,
         description="Filter logs by linked account owner ID"
     ),
+    api_key_name: str | None = Query(
+        default=None,
+        description="Filter logs by API key name"
+    ),
     limit: int = Query(
         default=100,
         ge=1,
@@ -78,6 +82,7 @@ async def get_execution_logs(
         function_name=function_name,
         app_configuration_id=app_configuration_id,
         linked_account_owner_id=linked_account_owner_id,
+        api_key_name=api_key_name,
         limit=limit,
         offset=offset,
     )
@@ -90,6 +95,9 @@ async def get_execution_logs(
         end_time=end_time,
         app_name=app_name,
         function_name=function_name,
+        app_configuration_id=app_configuration_id,
+        linked_account_owner_id=linked_account_owner_id,
+        api_key_name=api_key_name,
     )
 
     # Convert to response models

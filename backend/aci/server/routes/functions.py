@@ -174,10 +174,9 @@ async def get_function_definition(
     "/{function_name}/execute",
     response_model=FunctionExecutionResult,
     response_model_exclude_none=True,
-    dependencies=[Depends(deps.validate_monthly_quota)],
 )
 async def execute(
-        context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
+        context: Annotated[deps.RequestContext2, Depends(deps.validate_monthly_quota)],
         function_name: str,
         body: FunctionExecute,
 ) -> FunctionExecutionResult:
@@ -208,6 +207,7 @@ async def execute(
         execution_time=execution_time,
         linked_account_owner_id=linked_account_owner_id,
         app_configuration_id=str(app_configuration_id),
+        api_key_name=context.api_key_name,
         request=body.function_input,
         response=result.data if result.success else result.error,
         created_at=created_at,

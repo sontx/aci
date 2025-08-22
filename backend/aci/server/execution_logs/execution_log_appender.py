@@ -39,6 +39,7 @@ class LogEvent:
     id: UUID
     function_name: str
     app_name: str
+    api_key_name: Optional[str]
     linked_account_owner_id: Optional[str]
     app_configuration_id: Optional[UUID]
     status: ExecutionStatus
@@ -90,6 +91,7 @@ class LogAppenderBase(abc.ABC):
             execution_time: int,
             linked_account_owner_id: Optional[str] = None,
             app_configuration_id: Optional[str] = None,
+            api_key_name: Optional[str] = None,
             request: Optional[dict] = None,
             response: Optional[Any] = None,
             created_at: Optional[datetime] = None,
@@ -109,6 +111,7 @@ class LogAppenderBase(abc.ABC):
             "app_name": ev.app_name,
             "linked_account_owner_id": ev.linked_account_owner_id,
             "app_configuration_id": ev.app_configuration_id,
+            "api_key_name": ev.api_key_name,
             "status": ev.status.value,
             "execution_time": ev.execution_time,
             "created_at": ev.created_at,
@@ -178,6 +181,7 @@ class QueueLogAppender(LogAppenderBase):
             execution_time: int,
             linked_account_owner_id: Optional[str] = None,
             app_configuration_id: Optional[str] = None,
+            api_key_name: Optional[str] = None,
             request: Optional[dict] = None,
             response: Optional[Any] = None,
             created_at: Optional[datetime] = None,
@@ -189,6 +193,7 @@ class QueueLogAppender(LogAppenderBase):
             app_name=app_name,
             linked_account_owner_id=linked_account_owner_id,
             app_configuration_id=app_configuration_id,
+            api_key_name=api_key_name,
             status=status,
             execution_time=execution_time,
             created_at=created_at or datetime.now(timezone.utc),
@@ -272,6 +277,7 @@ class RedisLogAppender(LogAppenderBase):
             execution_time: int,
             linked_account_owner_id: Optional[str] = None,
             app_configuration_id: Optional[str] = None,
+            api_key_name: Optional[str] = None,
             request: Optional[dict] = None,
             response: Optional[Any] = None,
             created_at: Optional[datetime] = None,
@@ -285,6 +291,7 @@ class RedisLogAppender(LogAppenderBase):
             app_name=app_name,
             linked_account_owner_id=linked_account_owner_id,
             app_configuration_id=app_configuration_id,
+            api_key_name=api_key_name,
             status=status,
             execution_time=execution_time,
             created_at=created_at or datetime.now(timezone.utc),
@@ -349,6 +356,7 @@ class RedisLogAppender(LogAppenderBase):
                             linked_account_owner_id=data["linked_account_owner_id"],
                             app_configuration_id=UUID(data["app_configuration_id"]) if data[
                                 "app_configuration_id"] else None,
+                            api_key_name=data.get("api_key_name"),
                             status=ExecutionStatus(data["status"]),
                             execution_time=data["execution_time"],
                             created_at=datetime.fromisoformat(data["created_at"]),

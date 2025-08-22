@@ -22,6 +22,7 @@ from aci.server.log_schema_filter import LogSchemaFilter
 from aci.server.middleware.interceptor import InterceptorMiddleware, RequestContextFilter
 from aci.server.routes import (
     analytics,
+    api_keys,
     app_configurations,
     apps,
     user_apps,
@@ -101,7 +102,7 @@ if config.ENVIRONMENT != "local":
     logfire.instrument_sqlalchemy()
 
 logging.basicConfig()
-logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
+# logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
 
 """middlewares are executed in the reverse order"""
 # app.add_middleware(RateLimitMiddleware)
@@ -153,6 +154,13 @@ app.include_router(
     prefix=config.ROUTER_PREFIX_PROJECTS,
     tags=[config.ROUTER_PREFIX_PROJECTS.split("/")[-1]],
 )
+
+app.include_router(
+    api_keys.router,
+    prefix=config.ROUTER_PREFIX_API_KEYS,
+    tags=[config.ROUTER_PREFIX_API_KEYS.split("/")[-1]],
+)
+
 # TODO: add validate_project_quota to all routes
 app.include_router(
     apps.router,

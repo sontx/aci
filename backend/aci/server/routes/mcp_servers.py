@@ -235,5 +235,6 @@ async def remove_tool_from_mcp_server(
 async def mcp_handler(
         link: str,
         request: Request,
+        context: Annotated[deps.APIKeyContext, Depends(deps.get_api_key_context)],
 ):
-    return await handle_mcp_request(link, request)
+    return await handle_mcp_request(link, request, context)

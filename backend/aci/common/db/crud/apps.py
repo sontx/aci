@@ -166,6 +166,21 @@ def get_apps(
     return list(db_session.execute(statement).scalars().all())
 
 
+def get_apps_by_names(
+        db_session: Session,
+        app_names: list[str],
+) -> list[App]:
+    """
+    Get a list of apps by their names.
+    This is used for fetching multiple apps in one go.
+    """
+    if not app_names:
+        return []
+
+    statement = select(App).filter(App.name.in_(app_names))
+    return list(db_session.execute(statement).scalars().all())
+
+
 def count_apps(
         db_session: Session,
         public_only: bool,

@@ -24,7 +24,13 @@ export default function UsagePage() {
   return (
     <div>
       <div className="m-4 flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Usage</h1>
+        <div>
+          <h1 className="text-2xl font-bold">Usage</h1>
+          <div className="text-sm text-muted-foreground">
+            Monitor your application&apos;s quota usage and analyze trends with
+            detailed statistics and analytics.
+          </div>
+        </div>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
             <Badge variant="outline">{quotaUsage?.plan.name} Plan</Badge>

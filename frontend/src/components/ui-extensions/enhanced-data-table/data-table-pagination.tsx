@@ -93,11 +93,11 @@ export function DataTablePagination<TData>({
     <div className="flex flex-nowrap justify-between items-center px-3 py-1">
       {/* Left: Total row number information */}
       <div className="flex items-center gap-4">
-        <div className="text-sm font-medium">
+        <div className="text-sm font-medium hidden md:block">
           {startRow} – {endRow} / {totalCount ?? table.getRowCount()}
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Rows per page</span>
+          <span className="text-sm text-muted-foreground hidden md:block">Rows per page</span>
           <Select
             value={pageSize.toString()}
             onValueChange={(value) => {

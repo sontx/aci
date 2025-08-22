@@ -16,11 +16,10 @@ from mcp.types import Tool as MCPTool
 from sqlalchemy.orm import Session
 from starlette.types import Receive, Scope, Send
 
-from aci.common import processor, utils
+from aci.common import processor
 from aci.common.db import crud
 from aci.common.db.crud.apps import get_app
 from aci.common.db.crud.functions import get_functions_by_app_id
-from aci.common.db.crud.mcp_servers import get_mcp_server_by_id
 from aci.common.db.sql_models import Function, MCPServer
 from aci.common.enums import ExecutionStatus
 from aci.common.exceptions import FunctionNotFound, AppConfigurationNotFound, AppConfigurationDisabled, \
@@ -30,6 +29,7 @@ from aci.common.schemas.function import FunctionExecutionResult
 from aci.server import config
 from aci.server import security_credentials_manager as scm
 from aci.server.context import request_id_ctx_var
+from aci.server.dependencies import APIKeyContext
 from aci.server.execution_logs.execution_log_appender import log_appender
 from aci.server.function_executors import get_executor
 from aci.server.quota_service import consume_monthly_quota
@@ -40,11 +40,17 @@ router = APIRouter()
 
 
 class MCPRequestContext:
-    def __init__(self, db_session: Session, linked_account_owner_id: str | None = None,
-                 execution_id: UUID | None = None):
+    def __init__(
+            self,
+            db_session: Session,
+            linked_account_owner_id: str | None = None,
+            execution_id: UUID | None = None,
+            api_key_name: str | None = None,
+    ):
         self.db_session = db_session
         self.linked_account_owner_id = linked_account_owner_id
         self.execution_id = execution_id
+        self.api_key_name = api_key_name
 
 
 mcp_request_ctx_var = contextvars.ContextVar[MCPRequestContext | None]("mcp_request_ctx_var", default=None)
@@ -53,14 +59,15 @@ mcp_request_ctx_var = contextvars.ContextVar[MCPRequestContext | None]("mcp_requ
 class MCPAppServer:
     """MCP Server for a specific app using StreamableHTTPSessionManager"""
 
-    def __init__(self, mcp_server: MCPServer, db_session: Session):
+    def __init__(self, mcp_server: MCPServer, db_session: Session, project_id: UUID):
         self.mcp_server_id = mcp_server.id
+        self.project_id = project_id
         self.session_manager = None
         self._session_manager_started = False
-        self._initialize(db_session)
+        self._initialize(db_session, mcp_server)
         self._setup_handlers()
 
-    def _initialize(self, db_session: Session):
+    def _initialize(self, db_session: Session, mcp_server: MCPServer):
         def format_function_definition(function: Function) -> MCPTool:
             """Format function definition for MCP"""
 
@@ -69,13 +76,6 @@ class MCPAppServer:
                 description=function.description,
                 inputSchema=processor.filter_visible_properties(function.parameters),
                 outputSchema=processor.filter_visible_properties(function.response) if function.response else None,
-            )
-
-        mcp_server = get_mcp_server_by_id(db_session, self.mcp_server_id)
-        if not mcp_server:
-            raise HTTPException(
-                status_code=404,
-                detail=f"MCP server with ID {self.mcp_server_id} not found"
             )
 
         app = get_app(db_session, mcp_server.app_name, public_only=False, active_only=False)
@@ -87,7 +87,6 @@ class MCPAppServer:
 
         self.app_name = app.name
         self.app_config_id = mcp_server.app_config_id
-        self.project_id = mcp_server.app_configuration.project_id
 
         allowed_function_names = mcp_server.allowed_tools
         allowed_functions: list[Function] = []
@@ -153,6 +152,7 @@ class MCPAppServer:
                 execution_time=execution_time,
                 linked_account_owner_id=context.linked_account_owner_id,
                 app_configuration_id=str(self.app_config_id),
+                api_key_name=context.api_key_name,
                 request=arguments,
                 response=result.data if result.success else result.error,
                 created_at=created_at,
@@ -416,7 +416,7 @@ class MCPServerCache:
                     self.mcp_servers_cache[link] = cache_item
                 return False
 
-    async def get(self, link: str, db_session: Session) -> MCPAppServer:
+    async def get(self, link: str, db_session: Session, project_id: UUID) -> MCPAppServer:
         """Get or create MCP server instance for the given app"""
         current_time = datetime.now(UTC)
 
@@ -453,7 +453,7 @@ class MCPServerCache:
                     detail=f"MCP server with link {link} not found"
                 )
 
-            mcp_app_server = MCPAppServer(mcp_server, db_session)
+            mcp_app_server = MCPAppServer(mcp_server, db_session, project_id)
             cache_item = MCPCacheItem(
                 server=mcp_app_server,
                 last_used_at=current_time,
@@ -477,8 +477,9 @@ class MCPServerCache:
 mcp_server_cache = MCPServerCache()
 
 
-async def handle_mcp_request(link: str, request: Request):
-    db_session = utils.create_db_session(config.DB_FULL_URL)
+async def handle_mcp_request(link: str, request: Request, context: APIKeyContext):
+    db_session = context.db_session
+
     try:
         linked_account_owner_id = request.headers.get(config.LINKED_ACCOUNT_OWNER_ID_HEADER,
                                                       request.query_params.get("linked_account_owner_id"))
@@ -487,11 +488,12 @@ async def handle_mcp_request(link: str, request: Request):
         mcp_request_ctx_var.set(MCPRequestContext(
             db_session=db_session,
             linked_account_owner_id=linked_account_owner_id,
-            execution_id=execution_id
+            execution_id=execution_id,
+            api_key_name=context.api_key_name,
         ))
 
         # Get MCP server for this app (marks as in use)
-        mcp_server = await mcp_server_cache.get(link, db_session)
+        mcp_server = await mcp_server_cache.get(link, db_session, context.project.id)
 
         # Determine response format based on Accept header
         accept_header = request.headers.get("accept", "")
@@ -502,4 +504,3 @@ async def handle_mcp_request(link: str, request: Request):
     finally:
         # Always release the cache item after use, even if an exception occurs
         await mcp_server_cache.release(link)
-        db_session.close()

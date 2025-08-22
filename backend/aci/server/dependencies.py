@@ -1,13 +1,13 @@
 from collections.abc import Generator
-from datetime import UTC, datetime, timedelta
-from typing import Annotated
+from typing import Annotated, Optional
 from typing import Callable
 from uuid import UUID
 
 from fastapi import Depends, Security
 from fastapi import Request, HTTPException, status
-from fastapi.security import APIKeyHeader, HTTPBearer
-from propelauth_py import User
+from fastapi.security import APIKeyHeader, HTTPBearer, HTTPAuthorizationCredentials
+from propelauth_py import User, UnknownLoginMethod
+from propelauth_py.user import OrgMemberInfo
 from sqlalchemy.orm import Session
 
 from aci.common import utils
@@ -15,21 +15,20 @@ from aci.common.db import crud
 from aci.common.db.sql_models import Project
 from aci.common.enums import APIKeyStatus
 from aci.common.exceptions import (
-    DailyQuotaExceeded,
     InvalidAPIKey,
     ProjectNotFound,
 )
 from aci.common.logging_setup import get_logger
-from aci.server import billing, config, acl
+from aci.server import config, acl
 from aci.server.config import ACI_PROJECT_ID_HEADER, ACI_ORG_ID_HEADER
 from aci.server.quota_service import consume_monthly_quota
 
 logger = get_logger(__name__)
-http_bearer = HTTPBearer(auto_error=True, description="login to receive a JWT token")
+http_bearer = HTTPBearer(auto_error=False, description="login to receive a JWT token")
 api_key_header = APIKeyHeader(
     name=config.ACI_API_KEY_HEADER,
     description="API key for authentication",
-    auto_error=True,
+    auto_error=False,
 )
 
 auth = acl.get_propelauth()
@@ -58,6 +57,20 @@ class RequestContext:
         self.user = user
         self.db_session = db_session
         self.project = project
+
+
+class RequestContext2(RequestContext):
+    def __init__(self, user: User, project: Project, db_session: Session, api_key_name: Optional[str] = None):
+        super().__init__(user, project, db_session)
+        self.api_key_name = api_key_name
+
+
+class APIKeyContext:
+    def __init__(self, project: Project, db_session: Session, api_key_name: str, api_key_id: UUID):
+        self.project = project
+        self.db_session = db_session
+        self.api_key_name = api_key_name
+        self.api_key_id = api_key_id
 
 
 def yield_db_session() -> Generator[Session, None, None]:
@@ -92,10 +105,10 @@ def validate_api_key(
         return api_key_id
 
 
-def get_header(header_name: str) -> Callable:
+def get_header(header_name: str, optional=False) -> Callable:
     async def dependency(request: Request) -> str:
         value = request.headers.get(header_name)
-        if value is None:
+        if value is None and not optional:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Missing header: {header_name}",
@@ -142,9 +155,121 @@ def get_request_context(
     )
 
 
+def get_request_context2(
+        db_session: Annotated[Session, Depends(yield_db_session)],
+        jwt_token: Annotated[Optional[HTTPAuthorizationCredentials], Security(http_bearer)] = None,
+        api_key: Annotated[Optional[str], Security(api_key_header)] = None,
+        prefer_org_id: UUID | None = Depends(get_header(ACI_ORG_ID_HEADER, optional=True)),
+        project_id: UUID | None = Depends(get_header(ACI_PROJECT_ID_HEADER, optional=True)),
+) -> RequestContext2:
+    """
+    Returns a RequestContext2 object that supports both user JWT authentication and API key authentication.
+    Either a valid JWT token or a valid API key must be provided.
+    """
+
+    # Try API key authentication first
+    if api_key:
+        api_key_context = get_api_key_context(
+            db_session=db_session,
+            api_key=api_key,
+        )
+
+        project = api_key_context.project
+
+        org_id = str(project.org_id)
+        return RequestContext2(
+            # An api key user which is not a real user but a placeholder for API key authentication
+            user=User(
+                user_id=str(api_key_context.api_key_id),
+                email="",
+                login_method=UnknownLoginMethod(),
+                org_id_to_org_member_info={
+                    org_id: OrgMemberInfo(
+                        org_id=org_id,
+                        org_name="",
+                        user_assigned_role="",
+                        org_metadata={},
+                        user_permissions=[],
+                        user_inherited_roles_plus_current_role=[],
+                    )
+                }
+            ),
+            project=project,
+            db_session=db_session,
+            api_key_name=api_key_context.api_key_name,
+        )
+    # Try JWT authentication if no API key provided
+    elif jwt_token:
+        if not project_id:
+            logger.error("Project ID must be provided when using JWT authentication")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Missing project ID in header '{ACI_PROJECT_ID_HEADER}'"
+            )
+        if not prefer_org_id:
+            logger.error("Organization ID must be provided when using JWT authentication")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Missing organization ID in header '{ACI_ORG_ID_HEADER}'"
+            )
+
+        user = auth.require_user(jwt_token)
+        context = get_request_context(user, db_session, prefer_org_id, project_id)
+        return RequestContext2(
+            user=context.user,
+            project=context.project,
+            db_session=context.db_session,
+        )
+    else:
+        logger.error("No authentication method provided")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Either JWT token or API key must be provided for authentication"
+        )
+
+
+def get_api_key_context(
+        db_session: Annotated[Session, Depends(yield_db_session)],
+        api_key: Annotated[Optional[str], Security(api_key_header)] = None,
+) -> APIKeyContext:
+    """
+    Returns an APIKeyContext object containing the project and API key name.
+    This is used for API key authenticated requests.
+    """
+    if not api_key:
+        logger.error("API key must be provided for API key authenticated requests")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Missing API key in header '{config.ACI_API_KEY_HEADER}'"
+        )
+
+    # Verify API key and extract information
+    api_key_extract = crud.api_keys.extract_api_key(
+        db_session, api_key,
+    )
+
+    if not api_key_extract:
+        logger.error(f"API key verification failed, partial_api_key={api_key[:4]}****{api_key[-4:]}")
+        raise InvalidAPIKey("Invalid or inactive API key")
+
+    # Get the project
+    project = api_key_extract.project
+
+    return APIKeyContext(
+        project=project,
+        db_session=db_session,
+        api_key_name=api_key_extract.name,
+        api_key_id=api_key_extract.id,
+    )
+
+
 async def validate_monthly_quota(
-        context: RequestContext = Depends(get_request_context)
-) -> RequestContext:
+        db_session: Annotated[Session, Depends(yield_db_session)],
+        jwt_token: Annotated[Optional[HTTPAuthorizationCredentials], Security(http_bearer)] = None,
+        api_key: Annotated[Optional[str], Security(api_key_header)] = None,
+        prefer_org_id: UUID = Depends(get_header(ACI_ORG_ID_HEADER, optional=True)),
+        project_id: UUID = Depends(get_header(ACI_PROJECT_ID_HEADER, optional=True)),
+) -> RequestContext2:
     """
     Use quota for a project operation.
 
@@ -153,5 +278,12 @@ async def validate_monthly_quota(
     3. Increment usage or raise error if exceeded
     """
 
+    context = get_request_context2(
+        db_session=db_session,
+        jwt_token=jwt_token,
+        api_key=api_key,
+        prefer_org_id=prefer_org_id,
+        project_id=project_id,
+    )
     await consume_monthly_quota(context.db_session, context.project.id, 1)
     return context

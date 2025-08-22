@@ -36,6 +36,7 @@ export interface ExecutionLogSearchParams {
   function_name?: string;
   app_configuration_id?: string;
   linked_account_owner_id?: string;
+  api_key_name?: string;
   limit?: number;
   offset?: number;
 }

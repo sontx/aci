@@ -14,12 +14,14 @@ import { useMemo } from "react";
 interface LogsViewProps {
   appConfigId?: string;
   linkedAccountOwnerId?: string;
+  apiKeyName?: string;
   showStatistics?: boolean;
 }
 
 export function LogsView({
   appConfigId,
   linkedAccountOwnerId,
+  apiKeyName,
   showStatistics = false,
 }: LogsViewProps) {
   const {
@@ -43,6 +45,7 @@ export function LogsView({
   } = useLogsTable({
     appConfigId,
     linkedAccountOwnerId,
+    apiKeyName,
   });
 
   const columns = useLogsTableColumns({

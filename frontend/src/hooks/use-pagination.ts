@@ -32,7 +32,7 @@ export function usePagination() {
       onPageSizeChange: handlePageSizeChange,
     },
     beParams: {
-      pageSize,
+      limit: pageSize,
       offset: currentPage * pageSize,
     },
     resetPagination,
