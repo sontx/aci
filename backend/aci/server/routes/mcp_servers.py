@@ -6,7 +6,7 @@ from aci.common.db import crud
 from aci.common.db.crud.mcp_servers import get_full_mcp_server_link
 from aci.common.db.sql_models import MCPServer
 from aci.common.logging_setup import get_logger
-from aci.common.schemas.mcp_servers import MCPServerResponse, MCPServerCreate, MCPServerListQuery
+from aci.common.schemas.mcp_servers import MCPServerResponse, MCPServerCreate, MCPServerListQuery, MCPServerUpdate
 from aci.server import dependencies as deps
 from aci.server.mcp.mcp_handlers import handle_mcp_request
 
@@ -132,6 +132,32 @@ async def get_mcp_server(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"MCP server with ID {mcp_server_id} not found"
         )
+
+    return to_mcp_server_response(mcp_server)
+
+
+@router.put("/{mcp_server_id}")
+async def update_mcp_server(
+        context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
+        mcp_server_id: str,
+        mcp_server_data: MCPServerUpdate,
+) -> MCPServerResponse:
+    """
+    Update an existing MCP server.
+    """
+    mcp_server = crud.mcp_servers.get_mcp_server_by_id(context.db_session, mcp_server_id)
+
+    if not mcp_server:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"MCP server with ID {mcp_server_id} not found"
+        )
+
+    # Update allowed tools if provided
+    if mcp_server_data.allowed_tools is not None:
+        mcp_server.allowed_tools = mcp_server_data.allowed_tools
+
+    context.db_session.commit()
 
     return to_mcp_server_response(mcp_server)
 

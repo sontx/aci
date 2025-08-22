@@ -94,6 +94,7 @@ class MCPAuthType(StrEnum):
     """
 
     SECRET_LINK = "secret_link"
+    API_KEY = "api_key"
     OAUTH2 = "oauth2"
 
 

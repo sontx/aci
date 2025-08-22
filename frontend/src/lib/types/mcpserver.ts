@@ -1,4 +1,4 @@
-export type MCPAuthType = "secret_link" | "oauth2";
+export type MCPAuthType = "secret_link" | "oauth2" | "api_key";
 
 export interface MCPServerCreate {
   name: string;

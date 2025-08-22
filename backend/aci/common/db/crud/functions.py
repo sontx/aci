@@ -136,9 +136,13 @@ def get_functions_by_app_id(db_session: Session, app_id: UUID) -> list[Function]
 
 
 def get_function(
-        db_session: Session, function_name: str, public_only: bool, active_only: bool
+        db_session: Session, function_name: str, public_only: bool, active_only: bool, project_id: UUID | None = None
 ) -> Function | None:
-    statement = select(Function).filter(Function.project_id.is_(None), Function.name == function_name)
+    if project_id is None:
+        # If project_id is None, we assume it's a global function
+        statement = select(Function).filter(Function.project_id.is_(None), Function.name == function_name)
+    else:
+        statement = select(Function).filter(Function.project_id == project_id, Function.name == function_name)
 
     # filter out all functions of inactive apps and all inactive functions
     # (where app is active buy specific functions can be inactive)

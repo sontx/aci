@@ -17,6 +17,13 @@ class MCPServerCreate(BaseModel):
     )
 
 
+class MCPServerUpdate(BaseModel):
+    allowed_tools: list[str] | None = Field(
+        default=None,
+        description="List of tools allowed to access this MCP server",
+    )
+
+
 class MCPServerResponse(BaseModel):
     id: str
     name: str

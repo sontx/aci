@@ -31,7 +31,7 @@ export function MCPServerOverview({ mcpServer }: MCPServerOverviewProps) {
           <div className="flex items-center gap-3">
             <div className="relative h-8 w-8 flex-shrink-0 overflow-hidden rounded-lg">
               <Image
-                src={app.logo}
+                src={app.logo || "/icon/default-app-icon.svg"}
                 alt={`${app.display_name} logo`}
                 fill
                 className="object-contain"

@@ -37,11 +37,29 @@ import { generateRandomChars } from "@/utils/string";
 const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
   app_config_id: z.string().min(1, "App configuration is required"),
-  auth_type: z.enum(["secret_link", "oauth2"] as const),
+  auth_type: z.enum(["secret_link", "oauth2", "api_key"] as const),
   allowed_tools: z.array(z.string()).min(1, "At least one tool is required"),
 });
 
 type FormValues = z.infer<typeof formSchema>;
+
+const AuthenticationTypes = [
+  {
+    value: "secret_link",
+    label: "Secret Link",
+    description: "For simple authentication using a secret link",
+  },
+  {
+    value: "oauth2",
+    label: "OAuth2",
+    description: "It's a MCP standard for authentication (coming soon)",
+  },
+  {
+    value: "api_key",
+    label: "API Key",
+    description: "Not a MCP standard but good enough for now",
+  },
+];
 
 interface MCPServerFormContentProps {
   mcpServer?: MCPServerResponse;
@@ -207,27 +225,50 @@ export function MCPServerFormContent({
         <FormField
           control={form.control}
           name="auth_type"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Authentication Type</FormLabel>
-              <Select
-                onValueChange={field.onChange}
-                value={field.value}
-                disabled={isEditing}
-              >
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select auth type" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  <SelectItem value="secret_link">Secret Link</SelectItem>
-                  <SelectItem value="oauth2">OAuth2</SelectItem>
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
+          render={({ field }) => {
+            const currentType = AuthenticationTypes.find(
+              (t) => t.value === field.value,
+            );
+
+            return (
+              <FormItem>
+                <FormLabel>Authentication Type</FormLabel>
+                <Select
+                  onValueChange={field.onChange}
+                  value={field.value}
+                  disabled={isEditing}
+                >
+                  <FormControl>
+                    <SelectTrigger className="h-auto">
+                      {currentType ? (
+                        <div className="text-left">
+                          {currentType.label}
+                          <div className="text-xs text-muted-foreground">
+                            {currentType.description}
+                          </div>
+                        </div>
+                      ) : (
+                        "Select an authentication type"
+                      )}
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {AuthenticationTypes.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>
+                        <div>
+                          {type.label}
+                          <div className="text-xs text-muted-foreground">
+                            {type.description}
+                          </div>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            );
+          }}
         />
 
         <FormField

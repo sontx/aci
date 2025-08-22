@@ -21,7 +21,7 @@ from aci.common.db import crud
 from aci.common.db.crud.apps import get_app
 from aci.common.db.crud.functions import get_functions_by_app_id
 from aci.common.db.sql_models import Function, MCPServer
-from aci.common.enums import ExecutionStatus
+from aci.common.enums import ExecutionStatus, MCPAuthType
 from aci.common.exceptions import FunctionNotFound, AppConfigurationNotFound, AppConfigurationDisabled, \
     LinkedAccountNotFound, LinkedAccountDisabled
 from aci.common.logging_setup import get_logger
@@ -59,7 +59,7 @@ mcp_request_ctx_var = contextvars.ContextVar[MCPRequestContext | None]("mcp_requ
 class MCPAppServer:
     """MCP Server for a specific app using StreamableHTTPSessionManager"""
 
-    def __init__(self, mcp_server: MCPServer, db_session: Session, project_id: UUID):
+    def __init__(self, mcp_server: MCPServer, db_session: Session, project_id: UUID | None):
         self.mcp_server_id = mcp_server.id
         self.project_id = project_id
         self.session_manager = None
@@ -87,6 +87,8 @@ class MCPAppServer:
 
         self.app_name = app.name
         self.app_config_id = mcp_server.app_config_id
+        if not self.project_id:
+            self.project_id = mcp_server.app_configuration.project_id
 
         allowed_function_names = mcp_server.allowed_tools
         allowed_functions: list[Function] = []
@@ -106,6 +108,9 @@ class MCPAppServer:
                 description=function_def.description,
                 inputSchema=function_def.inputSchema,
                 outputSchema=function_def.outputSchema,
+                _meta={
+                    "project_id": str(function.project_id) if function.project_id else None,
+                }
             )
             tools.append(tool)
         self.tools = tools
@@ -131,6 +136,10 @@ class MCPAppServer:
 
             await consume_monthly_quota(context.db_session, self.project_id, 1)
 
+            found_tool = next(
+                (tool for tool in self.tools if tool.name == name), None
+            )
+
             function, result = await execute_function(
                 db_session=context.db_session,
                 function_name=name,
@@ -138,6 +147,7 @@ class MCPAppServer:
                 app_config_id=self.app_config_id,
                 mcp_server_id=self.mcp_server_id,
                 linked_account_owner_id=context.linked_account_owner_id or "default",
+                project_id=found_tool.meta.get("project_id", None) if found_tool else None,
             )
 
             end = time.perf_counter()
@@ -219,6 +229,7 @@ async def execute_function(
         app_config_id: UUID,
         mcp_server_id: str,
         linked_account_owner_id: str,
+        project_id: str | None = None,
 ) -> tuple[Function, FunctionExecutionResult]:
     # Get the function
     function = crud.functions.get_function(
@@ -226,6 +237,7 @@ async def execute_function(
         function_name,
         False,
         True,
+        UUID(project_id) if project_id else None,
     )
     if not function:
         logger.error(
@@ -416,7 +428,7 @@ class MCPServerCache:
                     self.mcp_servers_cache[link] = cache_item
                 return False
 
-    async def get(self, link: str, db_session: Session, project_id: UUID) -> MCPAppServer:
+    async def get(self, link: str, db_session: Session, project_id: UUID | None) -> MCPAppServer:
         """Get or create MCP server instance for the given app"""
         current_time = datetime.now(UTC)
 
@@ -453,6 +465,8 @@ class MCPServerCache:
                     detail=f"MCP server with link {link} not found"
                 )
 
+            self.validate_auth_type(mcp_server.auth_type)
+
             mcp_app_server = MCPAppServer(mcp_server, db_session, project_id)
             cache_item = MCPCacheItem(
                 server=mcp_app_server,
@@ -463,6 +477,29 @@ class MCPServerCache:
             self.mcp_servers_cache[link] = cache_item
             logger.debug(f"Created new MCP server instance for link: {link} (ref_count: 1)")
             return mcp_app_server
+
+    def validate_auth_type(self, auth_type: MCPAuthType):
+        context = mcp_request_ctx_var.get()
+
+        # Secret link won't allow api key
+        if auth_type == MCPAuthType.SECRET_LINK:
+            if context.api_key_name:
+                raise HTTPException(
+                    status_code=403,
+                    detail="MCP server with secret link does not support API key authentication"
+                )
+
+        if auth_type == MCPAuthType.API_KEY and not context.api_key_name:
+            raise HTTPException(
+                status_code=401,
+                detail="MCP server with API key authentication requires an API key"
+            )
+
+        if auth_type == MCPAuthType.OAUTH2:
+            raise HTTPException(
+                status_code=401,
+                detail="MCP server with OAuth2 authentication is not supported yet"
+            )
 
     async def release(self, link: str):
         """Release a cache item after use"""
@@ -493,7 +530,7 @@ async def handle_mcp_request(link: str, request: Request, context: APIKeyContext
         ))
 
         # Get MCP server for this app (marks as in use)
-        mcp_server = await mcp_server_cache.get(link, db_session, context.project.id)
+        mcp_server = await mcp_server_cache.get(link, db_session, context.project.id if context.project else None)
 
         # Determine response format based on Accept header
         accept_header = request.headers.get("accept", "")

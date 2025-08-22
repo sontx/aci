@@ -66,7 +66,12 @@ class RequestContext2(RequestContext):
 
 
 class APIKeyContext:
-    def __init__(self, project: Project, db_session: Session, api_key_name: str, api_key_id: UUID):
+    def __init__(
+            self, db_session: Session,
+            project: Project | None = None,
+            api_key_name: str | None = None,
+            api_key_id: UUID | None = None
+    ):
         self.project = project
         self.db_session = db_session
         self.api_key_name = api_key_name
@@ -237,10 +242,8 @@ def get_api_key_context(
     This is used for API key authenticated requests.
     """
     if not api_key:
-        logger.error("API key must be provided for API key authenticated requests")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Missing API key in header '{config.ACI_API_KEY_HEADER}'"
+        return APIKeyContext(
+            db_session=db_session,
         )
 
     # Verify API key and extract information
