@@ -84,20 +84,22 @@ export default function AppConfigDetailPage() {
     [updateLinkedAccount],
   );
 
-  const linkedAccountsColumns =
-    useLinkedAccountsTableColumns(toggleAccountStatus, true);
+  const linkedAccountsColumns = useLinkedAccountsTableColumns(
+    toggleAccountStatus,
+    true,
+  );
 
   const secondaryActions = useMemo<SecondaryAction[]>(() => {
     if (!app || !appConfig) return [];
-    
+
     return [
       {
-        label: "Add MCP Server", 
+        label: "Add MCP Server",
         description: "Add a new Model Context Protocol server",
         icon: <Server className="h-4 w-4" />,
         onClick: () => {
           // This will trigger the MCP server form dialog
-          const mcpButton = document.getElementById('mcp-server-trigger');
+          const mcpButton = document.getElementById("mcp-server-trigger");
           if (mcpButton) {
             mcpButton.click();
           }
@@ -133,7 +135,7 @@ export default function AppConfigDetailPage() {
             <Link href={`/apps/${app?.name}`}>
               <h1 className="text-2xl font-semibold">{app?.display_name}</h1>
             </Link>
-            <IdDisplay id={app?.name ?? ""} />
+            <p className="text-sm text-muted-foreground">{app?.description}</p>
           </div>
         </div>
         {app && appConfig && (
@@ -165,7 +167,7 @@ export default function AppConfigDetailPage() {
             >
               <button
                 id="mcp-server-trigger"
-                style={{ display: 'none' }}
+                style={{ display: "none" }}
                 aria-hidden="true"
               />
             </MCPServerForm>
