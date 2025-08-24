@@ -2,7 +2,7 @@ import json
 
 from fastapi import status
 from limits import RateLimitItem, RateLimitItemPerDay, RateLimitItemPerSecond
-from limits.aio.storage import MemoryStorage
+from limits.aio.storage import MemoryStorage, RedisStorage, Storage
 from limits.aio.strategies import MovingWindowRateLimiter
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
@@ -10,7 +10,14 @@ from starlette.responses import Response
 from starlette.types import ASGIApp
 
 from aci.common.logging_setup import get_logger
-from aci.server.config import RATE_LIMIT_IP_PER_DAY, RATE_LIMIT_IP_PER_SECOND
+from aci.server.config import (
+    RATE_LIMIT_IP_PER_DAY,
+    RATE_LIMIT_IP_PER_SECOND,
+    REDIS_HOST,
+    REDIS_PORT,
+    REDIS_DB,
+    REDIS_PASSWORD,
+)
 
 logger = get_logger(__name__)
 
@@ -19,12 +26,24 @@ logger = get_logger(__name__)
 class RateLimitMiddleware(BaseHTTPMiddleware):
     def __init__(self, app: ASGIApp) -> None:
         super().__init__(app)
-        self.storage = MemoryStorage()
+        self.storage = self._get_storage()
         self.limiter = MovingWindowRateLimiter(self.storage)
         self.rate_limits: dict[str, RateLimitItem] = {
             "ip-per-second": RateLimitItemPerSecond(amount=RATE_LIMIT_IP_PER_SECOND),
             "ip-per-day": RateLimitItemPerDay(amount=RATE_LIMIT_IP_PER_DAY),
         }
+
+    @staticmethod
+    def _get_storage() -> Storage:
+        if REDIS_HOST:
+            logger.info(f"Using RedisStorage for rate limiting, host={REDIS_HOST}")
+            uri = f"async+redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}" \
+                if REDIS_PASSWORD \
+                else f"async+redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
+            return RedisStorage(uri, implementation="redispy")
+        else:
+            logger.info("Using MemoryStorage for rate limiting")
+            return MemoryStorage()
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         # Determine the rate limit key based on authentication method

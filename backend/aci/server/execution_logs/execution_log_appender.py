@@ -18,13 +18,9 @@ from aci.server.config import (
     EXECUTION_LOG_APPENDER_FLUSH_EVERY_MS,
     EXECUTION_LOG_APPENDER_MAX_BATCH,
     EXECUTION_LOG_APPENDER_DROP_POLICY,
-    EXECUTION_LOG_APPENDER_IMPLEMENTATION,
     EXECUTION_LOG_APPENDER_REDIS_QUEUE_NAME,
-    REDIS_DB,
-    REDIS_HOST,
-    REDIS_PORT,
-    REDIS_PASSWORD,
 )
+from aci.server.redis_client import redis_client
 
 logger = logging.getLogger(__name__)
 
@@ -423,23 +419,14 @@ class AsyncRedisLogAppender(LogAppenderBase):
 
 
 log_appender: LogAppenderBase
-if EXECUTION_LOG_APPENDER_IMPLEMENTATION == "queue":
+if not redis_client:
     log_appender = AsyncQueueLogAppender(
         max_queue=EXECUTION_LOG_APPENDER_MAX_QUEUE,
         flush_every_ms=EXECUTION_LOG_APPENDER_FLUSH_EVERY_MS,
         max_batch=EXECUTION_LOG_APPENDER_MAX_BATCH,
         drop_policy=EXECUTION_LOG_APPENDER_DROP_POLICY,
     )
-elif EXECUTION_LOG_APPENDER_IMPLEMENTATION == "redis":
-    import redis
-
-    redis_client = redis.asyncio.Redis(
-        host=REDIS_HOST,
-        port=REDIS_PORT,
-        db=REDIS_DB,
-        password=REDIS_PASSWORD,
-        decode_responses=True,
-    )
+elif redis_client:
     log_appender = AsyncRedisLogAppender(
         redis_client=redis_client,
         queue_name=EXECUTION_LOG_APPENDER_REDIS_QUEUE_NAME,
@@ -448,5 +435,3 @@ elif EXECUTION_LOG_APPENDER_IMPLEMENTATION == "redis":
         max_batch=EXECUTION_LOG_APPENDER_MAX_BATCH,
         drop_policy=EXECUTION_LOG_APPENDER_DROP_POLICY,
     )
-else:
-    raise ValueError(f"Unknown log appender implementation: {EXECUTION_LOG_APPENDER_IMPLEMENTATION}")

@@ -20,6 +20,7 @@ from aci.server.dependency_check import check_dependencies
 from aci.server.execution_logs.execution_log_appender import log_appender
 from aci.server.log_schema_filter import LogSchemaFilter
 from aci.server.middleware.interceptor import InterceptorMiddleware, RequestContextFilter
+from aci.server.middleware.ratelimit import RateLimitMiddleware
 from aci.server.routes import (
     analytics,
     api_keys,
@@ -105,7 +106,7 @@ logging.basicConfig()
 # logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
 
 """middlewares are executed in the reverse order"""
-# app.add_middleware(RateLimitMiddleware)
+app.add_middleware(RateLimitMiddleware)
 app.add_middleware(SessionMiddleware, secret_key=config.SIGNING_KEY)
 # TODO: for now, we don't use TrustedHostMiddleware because it blocks health check from AWS ALB:
 # When ALB send health check request, it uses the task IP as the host, instead of the DNS name.
