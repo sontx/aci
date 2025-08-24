@@ -81,7 +81,7 @@ export function BasicInfoTab({
         <div className="space-y-2">
           <Label>App Name</Label>
           <div className="p-2 bg-gray-50 rounded border text-sm font-mono">
-            {isEditing ? userAppName : generatedName || "ORG_EXAMPLE_APP"}
+            {isEditing ? userAppName : generatedName || "EXAMPLE_APP"}
           </div>
           <p className="text-xs text-muted-foreground">
             Auto-generated from display name{" "}

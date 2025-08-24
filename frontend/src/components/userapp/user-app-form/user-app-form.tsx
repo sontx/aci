@@ -3,11 +3,12 @@
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { useState } from "react";
+import React, { useState } from "react";
 import { UserAppFormContent } from "./user-app-form-content";
 
 interface UserAppFormProps {
@@ -45,15 +46,14 @@ export function UserAppForm({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent
-        className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto"
-        onInteractOutside={(e) => {
-          e.preventDefault();
-        }}
-        onEscapeKeyDown={(e) => e.preventDefault()}
-      >
+      <DialogContent preventCloseOnClickOutside preventCloseOnEscapeKeyDown>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>
+            {userAppName
+              ? `Edit the configuration of the your own app "${userAppName}".`
+              : "Fill in the details to create a new your own app."}
+          </DialogDescription>
         </DialogHeader>
 
         <UserAppFormContent
