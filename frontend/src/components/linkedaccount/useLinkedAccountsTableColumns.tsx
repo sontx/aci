@@ -3,8 +3,7 @@ import { type ColumnDef, createColumnHelper } from "@tanstack/react-table";
 import { LinkedAccount } from "@/lib/types/linkedaccount";
 import { Button } from "@/components/ui/button";
 import { GoTrash } from "react-icons/go";
-import { ArrowUpDown, Eye } from "lucide-react";
-import Link from "next/link";
+import { ArrowUpDown, User } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,10 +19,10 @@ import { toast } from "sonner";
 import { useDeleteLinkedAccount } from "@/hooks/use-linked-account";
 import { AppItemDisplay } from "@/components/apps/app-item-display";
 import { IdDisplay } from "@/components/apps/id-display";
-import { LinkedAccountDetails } from "@/components/linkedaccount/linked-account-details";
 import { EnhancedSwitch } from "@/components/ui-extensions/enhanced-switch/enhanced-switch";
-import { formatToLocalTime, formatRelativeTime } from "@/utils/time";
+import { formatRelativeTime, formatToLocalTime } from "@/utils/time";
 import { useMetaInfo } from "@/components/context/metainfo";
+import { RouterLink } from "@/components/ui-extensions/router-link";
 
 const columnHelper = createColumnHelper<LinkedAccount>();
 
@@ -33,7 +32,6 @@ export const useLinkedAccountsTableColumns = (
     newStatus: boolean,
   ) => Promise<boolean>,
   noAppnameColumn = false,
-  useDetailPage = false,
 ): ColumnDef<LinkedAccount>[] => {
   const { mutateAsync: deleteLinkedAccount } = useDeleteLinkedAccount();
   const { activeProject } = useMetaInfo();
@@ -41,6 +39,38 @@ export const useLinkedAccountsTableColumns = (
   return useMemo(
     () =>
       [
+        columnHelper.accessor((row) => [row.linked_account_owner_id], {
+          id: "linked_account_owner_id",
+          header: ({ column }) => (
+            <div className="flex items-center justify-start">
+              <Button
+                variant="ghost"
+                onClick={() =>
+                  column.toggleSorting(column.getIsSorted() === "asc")
+                }
+                className="w-full justify-start px-0"
+              >
+                Owner ID
+                <ArrowUpDown className="h-4 w-4" />
+              </Button>
+            </div>
+          ),
+          cell: (info) => {
+            const [ownerId] = info.getValue();
+            return (
+              <RouterLink
+                href={`/linked-accounts/${info.cell.row.original.id}`}
+                className="flex items-center gap-2 flex-shrink-0"
+              >
+                <User className="h-6 w-6" />
+                <IdDisplay id={ownerId} dim={false} />
+              </RouterLink>
+            );
+          },
+          enableColumnFilter: true,
+          filterFn: "arrIncludes",
+        }) as ColumnDef<LinkedAccount>,
+
         noAppnameColumn
           ? undefined
           : (columnHelper.accessor("app_name", {
@@ -64,34 +94,6 @@ export const useLinkedAccountsTableColumns = (
               },
               enableGlobalFilter: true,
             }) as ColumnDef<LinkedAccount>),
-
-        columnHelper.accessor((row) => [row.linked_account_owner_id], {
-          id: "linked_account_owner_id",
-          header: ({ column }) => (
-            <div className="flex items-center justify-start">
-              <Button
-                variant="ghost"
-                onClick={() =>
-                  column.toggleSorting(column.getIsSorted() === "asc")
-                }
-                className="w-full justify-start px-0"
-              >
-                Owner ID
-                <ArrowUpDown className="h-4 w-4" />
-              </Button>
-            </div>
-          ),
-          cell: (info) => {
-            const [ownerId] = info.getValue();
-            return (
-              <div className="flex-shrink-0">
-                <IdDisplay id={ownerId} dim={false} />
-              </div>
-            );
-          },
-          enableColumnFilter: true,
-          filterFn: "arrIncludes",
-        }) as ColumnDef<LinkedAccount>,
 
         columnHelper.accessor("created_at", {
           header: ({ column }) => (
@@ -152,22 +154,6 @@ export const useLinkedAccountsTableColumns = (
             const account = info.getValue();
             return (
               <div className="space-x-2 flex">
-                {useDetailPage ? (
-                  <Link href={`/linked-accounts/${account.id}`}>
-                    <Button variant="ghost" size="sm">
-                      <Eye />
-                    </Button>
-                  </Link>
-                ) : (
-                  <LinkedAccountDetails
-                    account={account}
-                    toggleAccountStatus={toggleAccountStatus}
-                  >
-                    <Button variant="ghost" size="sm">
-                      <Eye />
-                    </Button>
-                  </LinkedAccountDetails>
-                )}
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="ghost" size="sm" className="text-red-600">
@@ -217,6 +203,6 @@ export const useLinkedAccountsTableColumns = (
           enableGlobalFilter: false,
         }) as ColumnDef<LinkedAccount>,
       ].filter(Boolean) as ColumnDef<LinkedAccount>[],
-    [noAppnameColumn, useDetailPage, toggleAccountStatus, activeProject, deleteLinkedAccount],
+    [noAppnameColumn, toggleAccountStatus, activeProject, deleteLinkedAccount],
   );
 };

@@ -162,7 +162,7 @@ export function AppSidebar() {
                               "flex items-center gap-3 px-4 py-2 transition-colors",
                               isCollapsed && "justify-center",
                               isActive &&
-                                "bg-primary/10 text-primary font-medium",
+                                "bg-primary/10 text-primary font-medium hover:bg-primary/10 hover:text-primary",
                             )}
                           >
                             <item.icon

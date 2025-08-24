@@ -20,6 +20,7 @@ import { useDeleteMCPServer } from "@/hooks/use-mcp-server";
 import { AppItemDisplay } from "@/components/apps/app-item-display";
 import { RouterLink } from "@/components/ui-extensions/router-link";
 import { formatRelativeTime, formatToLocalTime } from "@/utils/time";
+import { McpIcon } from "@/components/icons/mcp";
 
 const columnHelper = createColumnHelper<MCPServerResponse>();
 
@@ -35,9 +36,9 @@ export const useMCPServersTableColumns = (): ColumnDef<MCPServerResponse>[] => {
           return (
             <RouterLink
               href={`/mcp-servers/${server.id}`}
-              className="text-nowrap"
+              className="flex items-center gap-2 text-nowrap"
             >
-              {info.getValue()}
+              <McpIcon className="h-4 w-4" /> {info.getValue()}
             </RouterLink>
           );
         },
@@ -54,7 +55,7 @@ export const useMCPServersTableColumns = (): ColumnDef<MCPServerResponse>[] => {
       }) as ColumnDef<MCPServerResponse>,
 
       columnHelper.accessor("auth_type", {
-        header: "Auth Type",
+        header: () => <span className="text-nowrap">Auth Type</span>,
         cell: (info) => (
           <Badge variant="outline" className="text-xs">
             {info.getValue()}
@@ -64,7 +65,7 @@ export const useMCPServersTableColumns = (): ColumnDef<MCPServerResponse>[] => {
       }) as ColumnDef<MCPServerResponse>,
 
       columnHelper.accessor("created_at", {
-        header: "Created At",
+        header: () => <span className="text-nowrap">Created At</span>,
         cell: (info) => (
           <div className="text-nowrap">
             {formatToLocalTime(info.getValue())}
@@ -74,7 +75,7 @@ export const useMCPServersTableColumns = (): ColumnDef<MCPServerResponse>[] => {
       }) as ColumnDef<MCPServerResponse>,
 
       columnHelper.accessor("updated_at", {
-        header: "Updated At",
+        header: () => <span className="text-nowrap">Updated At</span>,
         cell: (info) => (
           <div className="text-nowrap">
             {formatToLocalTime(info.getValue())}
@@ -84,7 +85,7 @@ export const useMCPServersTableColumns = (): ColumnDef<MCPServerResponse>[] => {
       }) as ColumnDef<MCPServerResponse>,
 
       columnHelper.accessor("last_used_at", {
-        header: "Last Used At",
+        header: () => <span className="text-nowrap">Last Used At</span>,
         cell: (info) => {
           const lastUsedAt = info.getValue();
           return (

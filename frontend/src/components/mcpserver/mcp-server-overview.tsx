@@ -14,6 +14,8 @@ import {
 } from "../ui/tooltip";
 import { useRegenerateMCPLink } from "@/hooks/use-mcp-server";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { formatToLocalTime } from "@/utils/time";
 
 interface MCPServerOverviewProps {
   mcpServer: MCPServerResponse;
@@ -46,14 +48,34 @@ export function MCPServerOverview({ mcpServer }: MCPServerOverviewProps) {
         {!app && <p className="text-sm font-mono">{mcpServer.app_name}</p>}
       </div>
 
-      <div>
-        <label className="text-sm font-medium text-muted-foreground">
-          Authentication Type
-        </label>
-        <div className="mt-1">
-          <Badge variant="outline" className="text-xs">
-            {mcpServer.auth_type}
-          </Badge>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
+        <div>
+          <label className="text-sm font-medium text-muted-foreground">
+            Authentication Type
+          </label>
+          <div className="mt-1">
+            <Badge variant="outline" className="text-xs">
+              {mcpServer.auth_type}
+            </Badge>
+          </div>
+        </div>
+        <div>
+          <label className="text-sm font-medium text-muted-foreground">
+            Created At
+          </label>
+          <div className="mt-1 text-sm">
+            {formatToLocalTime(mcpServer.created_at)}
+          </div>
+        </div>
+        <div>
+          <label className="text-sm font-medium text-muted-foreground">
+            Last Used At
+          </label>
+          <div className="mt-1 text-sm">
+            {mcpServer.last_used_at
+              ? formatToLocalTime(mcpServer.last_used_at)
+              : "Never"}
+          </div>
         </div>
       </div>
 
@@ -61,30 +83,34 @@ export function MCPServerOverview({ mcpServer }: MCPServerOverviewProps) {
         <div>
           <label className="flex gap-2 items-center text-sm font-medium text-muted-foreground">
             <span>MCP Link</span>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      regenerateMCPLink(mcpServer.id);
-                    }}
-                    className="text-gray-500 hover:text-gray-700"
-                    disabled={isGenerating}
-                  >
-                    <RefreshCcw
-                      className={cn("h-4 w-4", {
-                        "animate-spin": isGenerating,
-                      })}
-                    />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Regenerate MCP Link</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            {mcpServer.auth_type === "secret_link" && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-5 w-5 p-0"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        regenerateMCPLink(mcpServer.id);
+                      }}
+                      disabled={isGenerating}
+                    >
+                      <RefreshCcw
+                        className={cn("h-4 w-4", {
+                          "animate-spin": isGenerating,
+                        })}
+                      />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Regenerate MCP Link</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
           </label>
           <div className="mt-1">
             <IdDisplay id={mcpServer.mcp_link} dim={false} />

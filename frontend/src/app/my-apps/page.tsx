@@ -4,23 +4,29 @@ import { Button } from "@/components/ui/button";
 import { GoPlus } from "react-icons/go";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
-import { EnhancedDataTable } from "@/components/ui-extensions/enhanced-data-table/data-table";
+import {
+  EnhancedDataTable,
+  SearchBarProps,
+} from "@/components/ui-extensions/enhanced-data-table/data-table";
 import { useSearchUserApps } from "@/hooks/use-user-app";
 import { useUserAppsTableColumns } from "@/components/userapp/useUserAppsTableColumns";
 import { UserAppForm } from "@/components/userapp/user-app-form/user-app-form";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { UserAppSearchParams } from "@/lib/types/userapp";
-import { Input } from "@/components/ui/input";
 import { useDebounce } from "@uidotdev/usehooks";
 import { usePagination } from "@/hooks/use-pagination";
 
 export default function MyAppsPage() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [filterCategory, setFilterCategory] = useState<string | undefined>(
+    undefined,
+  );
   const { beParams, feParams, resetPagination } = usePagination();
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
   const searchParams: UserAppSearchParams = {
     search: debouncedSearchQuery || null,
+    categories: filterCategory ? [filterCategory] : undefined,
     ...beParams,
   };
 
@@ -36,6 +42,23 @@ export default function MyAppsPage() {
     (query: string) => {
       setSearchQuery(query);
       resetPagination();
+    },
+    [resetPagination],
+  );
+
+  const searchBarProps: SearchBarProps = useMemo(() => {
+    return {
+      placeholder: "Search user apps...",
+      serverSearchFn: handleSearchChange,
+    };
+  }, [handleSearchChange]);
+
+  const serverFilterFn = useCallback(
+    (columnName: string, value: string | undefined) => {
+      if (columnName === "categories") {
+        setFilterCategory(value);
+        resetPagination();
+      }
     },
     [resetPagination],
   );
@@ -58,16 +81,6 @@ export default function MyAppsPage() {
             </Button>
           </UserAppForm>
         </div>
-
-        {/* Search Input */}
-        <div className="mt-4 max-w-sm">
-          <Input
-            placeholder="Search user apps..."
-            value={searchQuery}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            className="w-full"
-          />
-        </div>
       </div>
       <Separator />
 
@@ -86,6 +99,8 @@ export default function MyAppsPage() {
           <EnhancedDataTable
             columns={columns}
             data={searchResult?.items || []}
+            searchBarProps={searchBarProps}
+            serverFilterFn={serverFilterFn}
             paginationOptions={{
               ...feParams,
               totalCount: searchResult?.total,

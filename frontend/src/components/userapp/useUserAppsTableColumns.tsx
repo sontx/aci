@@ -21,11 +21,13 @@ import { useDeleteUserApp } from "@/hooks/use-user-app";
 import { formatToLocalTime } from "@/utils/time";
 import { UserAppForm } from "./user-app-form/user-app-form";
 import { AppItemDisplay } from "@/components/apps/app-item-display";
+import { useCategories } from "@/hooks/use-app";
 
 const columnHelper = createColumnHelper<UserAppDetails>();
 
 export const useUserAppsTableColumns = (): ColumnDef<UserAppDetails>[] => {
   const { mutateAsync: deleteUserApp } = useDeleteUserApp();
+  const { data: allCategories = [] } = useCategories();
 
   return useMemo(
     () => [
@@ -63,19 +65,26 @@ export const useUserAppsTableColumns = (): ColumnDef<UserAppDetails>[] => {
           return (
             <div className="flex flex-wrap gap-1 max-w-48">
               {categories.slice(0, 2).map((category) => (
-                <Badge key={category} variant="outline" className="text-xs">
+                <Badge
+                  key={category}
+                  variant="outline"
+                  className="text-xs text-nowrap"
+                >
                   {category}
                 </Badge>
               ))}
               {categories.length > 2 && (
-                <Badge variant="outline" className="text-xs">
+                <Badge variant="outline" className="text-xs text-nowrap">
                   +{categories.length - 2}
                 </Badge>
               )}
             </div>
           );
         },
-        enableGlobalFilter: true,
+        enableColumnFilter: true,
+        meta: {
+          filterOptions: allCategories,
+        },
       }) as ColumnDef<UserAppDetails>,
 
       columnHelper.accessor("active", {

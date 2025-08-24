@@ -50,12 +50,17 @@ export function MCPServerFunctions({ mcpServer }: MCPServerFunctionsProps) {
     <div className="space-y-6 mb-4">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <span className="text-lg font-medium">Allowed Functions (Tools)</span>
-          {hasChanges && (
-            <Badge variant="outline" className="ml-2 text-xs">
-              {selectedFunctions.length} selected (unsaved changes)
-            </Badge>
-          )}
+          <div className="flex items-center gap-2">
+            <span className="text-lg font-semibold">Tools</span>
+            {hasChanges && (
+              <Badge variant="outline" className="text-xs">
+                {selectedFunctions.length} selected (unsaved changes)
+              </Badge>
+            )}
+          </div>
+          <div className="text-sm text-muted-foreground">
+            Select the tools this MCP server is allowed to use.
+          </div>
         </div>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">

@@ -8,6 +8,9 @@ import { useAppsMap } from "@/hooks/use-app";
 import { useAppConfigs } from "@/hooks/use-app-config";
 import { useLinkedAccounts } from "@/hooks/use-linked-account";
 import { useMCPServers } from "@/hooks/use-mcp-server";
+import { Button } from "@/components/ui/button";
+import { Store } from "lucide-react";
+import Link from "next/link";
 
 export default function AppConfigPage() {
   const { data: appConfigs = [], isPending: isConfigsPending } =
@@ -57,11 +60,17 @@ export default function AppConfigPage() {
       <div className="m-4 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">App Configurations</h1>
+          <p className="text-sm text-muted-foreground">
+            Configured apps enable seamless interaction with various platforms,
+            services, and functions.
+          </p>
         </div>
-        {/* <Button className="bg-primary hover:bg-primary/90 text-white">
-          <GoPlus />
-          Add App
-        </Button> */}
+        <Link href="/apps">
+          <Button>
+            <Store className="h-4 w-4" />
+            Browse Apps
+          </Button>
+        </Link>
       </div>
       <Separator />
 

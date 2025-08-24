@@ -20,6 +20,8 @@ declare module "@tanstack/react-table" {
   interface ColumnMeta<TData, TValue> {
     defaultSort?: boolean;
     defaultSortDesc?: boolean;
+    filterPrefix?: string;
+    filterOptions?: string[];
   }
 }
 
@@ -38,8 +40,9 @@ import { getRowSelectionColumn } from "@/components/ui-extensions/enhanced-data-
 import { DataTablePagination } from "@/components/ui-extensions/enhanced-data-table/data-table-pagination";
 import { Loader2Icon } from "lucide-react";
 
-interface SearchBarProps {
+export interface SearchBarProps {
   placeholder: string;
+  serverSearchFn?: (query: string) => void;
 }
 
 interface RowSelectionProps<TData> {
@@ -65,6 +68,7 @@ interface EnhancedDataTableProps<TData, TValue> {
   paginationOptions?: PaginationOptions;
   loading?: boolean;
   extraActionComponent?: React.ReactNode;
+  serverFilterFn?: (columnName: string, value: string | undefined) => void;
 }
 
 export function EnhancedDataTable<TData, TValue>({
@@ -76,6 +80,7 @@ export function EnhancedDataTable<TData, TValue>({
   paginationOptions,
   loading = false,
   extraActionComponent,
+  serverFilterFn,
 }: EnhancedDataTableProps<TData, TValue>) {
   const generatedDefaultSorting = useMemo(() => {
     if (defaultSorting.length > 0) return defaultSorting;
@@ -202,12 +207,21 @@ export function EnhancedDataTable<TData, TValue>({
             return (
               <ColumnFilter key={column.id} column={column} options={options} />
             );
+          } else if (column.columnDef.meta?.filterOptions && serverFilterFn) {
+            return (
+              <ColumnFilter
+                key={column.id}
+                column={column}
+                serverFilterFn={(value) => serverFilterFn(column.id, value)}
+              />
+            );
           }
+
           return null;
         })}
       </div>
     );
-  }, [data, table]);
+  }, [data, serverFilterFn, table]);
 
   return (
     <div>
@@ -215,6 +229,7 @@ export function EnhancedDataTable<TData, TValue>({
         <EnhancedDataTableToolbar
           table={table}
           placeholder={searchBarProps.placeholder}
+          serverSearchFn={searchBarProps.serverSearchFn}
           showSearchInput={hasFilterableColumns}
           filterComponent={filterComponents}
           extraActionComponent={extraActionComponent}

@@ -12,6 +12,7 @@ interface EnhancedDataTableToolbarProps<TData> {
   showSearchInput?: boolean;
   filterComponent?: React.ReactNode;
   extraActionComponent?: React.ReactNode;
+  serverSearchFn?: (query: string) => void;
 }
 
 export function EnhancedDataTableToolbar<TData>({
@@ -20,15 +21,21 @@ export function EnhancedDataTableToolbar<TData>({
   showSearchInput,
   filterComponent,
   extraActionComponent,
+  serverSearchFn,
 }: EnhancedDataTableToolbarProps<TData>) {
   const [searchValue, setSearchValue] = useState("");
 
   const handleSearch = (value: string) => {
     setSearchValue(value);
-    table.setGlobalFilter(value);
+    if (serverSearchFn) {
+      serverSearchFn(value);
+    } else {
+      table.setGlobalFilter(value);
+    }
   };
 
-  const isFiltered = !!table.getState().globalFilter;
+  const isFiltered =
+    (serverSearchFn && searchValue) || !!table.getState().globalFilter;
 
   // Don't render toolbar if there's no search input and no filter component
   if (!showSearchInput && !filterComponent) {
@@ -39,21 +46,21 @@ export function EnhancedDataTableToolbar<TData>({
     <div className="flex items-center justify-between py-4">
       <div className="flex items-center gap-4">
         {showSearchInput && (
-          <div className="flex items-center space-x-2">
+          <div className="relative">
             <Input
               placeholder={placeholder}
               value={searchValue}
               onChange={(event) => handleSearch(event.target.value)}
-              className="h-8 w-[250px]"
+              className="w-[250px] pr-8"
             />
             {isFiltered && (
               <Button
                 variant="ghost"
+                size="sm"
                 onClick={() => handleSearch("")}
-                className="h-8 px-2 lg:px-3"
+                className="absolute right-1 top-1/2 h-6 w-6 -translate-y-1/2 p-0 hover:bg-transparent"
               >
-                Clear
-                <X className="h-4 w-4" />
+                <X className="h-3 w-3 text-muted-foreground hover:text-foreground" />
               </Button>
             )}
           </div>

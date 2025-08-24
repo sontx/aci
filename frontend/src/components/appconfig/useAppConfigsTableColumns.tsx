@@ -51,7 +51,7 @@ export const useAppConfigsTableColumns = ({
               }
               className="w-full justify-start px-0"
             >
-              App Name
+              App
               <ArrowUpDown className="h-4 w-4" />
             </Button>
           </div>

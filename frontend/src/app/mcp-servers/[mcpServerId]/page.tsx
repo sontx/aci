@@ -6,6 +6,8 @@ import { useMCPServer } from "@/hooks/use-mcp-server";
 import { MCPServerOverview } from "@/components/mcpserver/mcp-server-overview";
 import { MCPServerFunctions } from "@/components/mcpserver/mcp-server-functions";
 import { AlertCircle, Loader2 } from "lucide-react";
+import * as React from "react";
+import { McpIcon } from "@/components/icons/mcp";
 
 export default function MCPServerDetailsPage() {
   const params = useParams();
@@ -35,11 +37,16 @@ export default function MCPServerDetailsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="m-4">
-        <div>
-          <h1 className="text-2xl font-bold">{mcpServer.name}</h1>
-          <p className="text-sm text-muted-foreground">
-            MCP Server details and configuration
-          </p>
+        <div className="flex items-center gap-4">
+          <div className="relative h-12 w-12 flex-shrink-0 overflow-hidden rounded-lg">
+            <McpIcon className="w-12 h-12" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold">{mcpServer.name}</h1>
+            <p className="text-sm text-muted-foreground">
+              MCP Server details and configuration
+            </p>
+          </div>
         </div>
       </div>
 
