@@ -4,7 +4,7 @@ export function McpIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg
       fill="currentColor"
-      fill-rule="evenodd"
+      fillRule="evenodd"
       height="1em"
       style={{ flex: "none", lineHeight: 1 }}
       viewBox="0 0 24 24"
