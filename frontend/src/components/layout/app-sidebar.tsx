@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/tooltip";
 import { ProjectSelector } from "./project-selector";
 import { OrgSelector } from "./org-selector";
+import { McpIcon } from "@/components/icons/mcp";
 
 const showLogDashboard =
   process.env.NEXT_PUBLIC_FEATURE_LOG_DASHBOARD === "true";
@@ -67,7 +68,7 @@ export const sidebarItems = [
   {
     title: "MCP Servers",
     url: `/mcp-servers`,
-    icon: HiOutlineServer,
+    icon: McpIcon,
   },
   {
     title: "API Keys",
