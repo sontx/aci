@@ -25,11 +25,10 @@ import { Separator } from "@/components/ui/separator";
 import { PiStorefront } from "react-icons/pi";
 import {
   RiFileList3Line,
+  RiKey2Line,
   RiLinkUnlinkM,
   RiSettings3Line,
-  RiKey2Line,
 } from "react-icons/ri";
-import { HiOutlineServer } from "react-icons/hi2";
 
 import {
   Tooltip,
@@ -115,10 +114,10 @@ export function AppSidebar() {
           {!isCollapsed && (
             <div className="h-8 w-auto relative flex items-center justify-center">
               <Image
-                src="/aci-dev-full-logo.svg"
-                alt="ACI Dev Logo"
-                width={150}
-                height={30}
+                src="/full-logo.svg"
+                alt="API Forest Logo"
+                width={130}
+                height={32}
                 priority
                 className="object-contain"
               />
