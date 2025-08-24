@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status, Request
 from aci.common.db import crud
 from aci.common.db.crud.mcp_servers import get_full_mcp_server_link
 from aci.common.db.sql_models import MCPServer
+from aci.common.enums import MCPAuthType
 from aci.common.logging_setup import get_logger
 from aci.common.schemas.mcp_servers import MCPServerResponse, MCPServerCreate, MCPServerListQuery, MCPServerUpdate
 from aci.server import dependencies as deps
@@ -29,7 +30,8 @@ async def create_mcp_server(
     from sqlalchemy import select
 
     app_config_statement = select(AppConfiguration).filter_by(id=mcp_server_data.app_config_id)
-    app_config = context.db_session.execute(app_config_statement).scalar_one_or_none()
+    result = await context.db_session.execute(app_config_statement)
+    app_config = result.scalar_one_or_none()
 
     if not app_config:
         raise HTTPException(
@@ -38,7 +40,7 @@ async def create_mcp_server(
         )
 
     # Check if MCP server with the same name already exists for this app config
-    existing_server = crud.mcp_servers.get_mcp_server_by_name_and_app_config(
+    existing_server = await crud.mcp_servers.get_mcp_server_by_name_and_app_config(
         context.db_session,
         mcp_server_data.name,
         mcp_server_data.app_config_id
@@ -51,7 +53,7 @@ async def create_mcp_server(
         )
 
     # Create the MCP server
-    mcp_server = crud.mcp_servers.create_mcp_server(
+    mcp_server = await crud.mcp_servers.create_mcp_server(
         context.db_session,
         name=mcp_server_data.name,
         app_config_id=mcp_server_data.app_config_id,
@@ -59,17 +61,19 @@ async def create_mcp_server(
         allowed_tools=mcp_server_data.allowed_tools,
     )
 
-    context.db_session.commit()
+    mcp_server_response = await to_mcp_server_response(mcp_server)
+    await context.db_session.commit()
+    return mcp_server_response
 
-    return to_mcp_server_response(mcp_server)
 
-
-def to_mcp_server_response(mcp_server: MCPServer) -> MCPServerResponse:
+async def to_mcp_server_response(mcp_server: MCPServer) -> MCPServerResponse:
+    app_configuration = await mcp_server.awaitable_attrs.app_configuration
+    app_name = app_configuration.app.name
     return MCPServerResponse(
         id=mcp_server.id,
         name=mcp_server.name,
         app_config_id=mcp_server.app_config_id,
-        app_name=mcp_server.app_name,
+        app_name=app_name,
         auth_type=mcp_server.auth_type,
         allowed_tools=mcp_server.allowed_tools,
         mcp_link=get_full_mcp_server_link(mcp_server.mcp_link),
@@ -88,7 +92,7 @@ async def list_mcp_servers(
     Get a list of MCP servers with optional filtering.
     """
     if query_params.app_config_id:
-        mcp_servers = crud.mcp_servers.get_mcp_servers_by_app_config(
+        mcp_servers = await crud.mcp_servers.get_mcp_servers_by_app_config(
             context.db_session,
             query_params.app_config_id,
             query_params.limit,
@@ -108,11 +112,12 @@ async def list_mcp_servers(
         if query_params.limit:
             statement = statement.limit(query_params.limit)
 
-        mcp_servers = list(context.db_session.execute(statement).scalars().all())
+        result = await context.db_session.execute(statement)
+        mcp_servers = list(result.scalars().all())
 
     response = []
     for server in mcp_servers:
-        response.append(to_mcp_server_response(server))
+        response.append(await to_mcp_server_response(server))
 
     return response
 
@@ -125,7 +130,7 @@ async def get_mcp_server(
     """
     Get a specific MCP server by ID.
     """
-    mcp_server = crud.mcp_servers.get_mcp_server_by_id(context.db_session, mcp_server_id)
+    mcp_server = await crud.mcp_servers.get_mcp_server_by_id(context.db_session, mcp_server_id)
 
     if not mcp_server:
         raise HTTPException(
@@ -133,7 +138,7 @@ async def get_mcp_server(
             detail=f"MCP server with ID {mcp_server_id} not found"
         )
 
-    return to_mcp_server_response(mcp_server)
+    return await to_mcp_server_response(mcp_server)
 
 
 @router.put("/{mcp_server_id}")
@@ -145,7 +150,7 @@ async def update_mcp_server(
     """
     Update an existing MCP server.
     """
-    mcp_server = crud.mcp_servers.get_mcp_server_by_id(context.db_session, mcp_server_id)
+    mcp_server = await crud.mcp_servers.get_mcp_server_by_id(context.db_session, mcp_server_id)
 
     if not mcp_server:
         raise HTTPException(
@@ -157,9 +162,9 @@ async def update_mcp_server(
     if mcp_server_data.allowed_tools is not None:
         mcp_server.allowed_tools = mcp_server_data.allowed_tools
 
-    context.db_session.commit()
-
-    return to_mcp_server_response(mcp_server)
+    mcp_server_response = await to_mcp_server_response(mcp_server)
+    await context.db_session.commit()
+    return mcp_server_response
 
 
 @router.put("/{mcp_server_id}/regenerate-link")
@@ -170,7 +175,7 @@ async def regenerate_mcp_link(
     """
     Regenerate the MCP link for an existing MCP server.
     """
-    mcp_server = crud.mcp_servers.get_mcp_server_by_id(context.db_session, mcp_server_id)
+    mcp_server = await crud.mcp_servers.get_mcp_server_by_id(context.db_session, mcp_server_id)
 
     if not mcp_server:
         raise HTTPException(
@@ -178,12 +183,18 @@ async def regenerate_mcp_link(
             detail=f"MCP server with ID {mcp_server_id} not found"
         )
 
+    if mcp_server.auth_type != MCPAuthType.SECRET_LINK:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="MCP link can only be regenerated for servers with SECRET_LINK auth type"
+        )
+
     # Regenerate the MCP link
-    new_mcp_link = crud.mcp_servers.regenerate_mcp_link(context.db_session, mcp_server)
+    await crud.mcp_servers.regenerate_mcp_link(context.db_session, mcp_server)
 
-    context.db_session.commit()
-
-    return to_mcp_server_response(mcp_server)
+    mcp_server_response = await to_mcp_server_response(mcp_server)
+    await context.db_session.commit()
+    return mcp_server_response
 
 
 @router.delete("/{mcp_server_id}")
@@ -194,7 +205,7 @@ async def delete_mcp_server(
     """
     Delete an MCP server by ID.
     """
-    success = crud.mcp_servers.delete_mcp_server(context.db_session, mcp_server_id)
+    success = await crud.mcp_servers.delete_mcp_server(context.db_session, mcp_server_id)
 
     if not success:
         raise HTTPException(
@@ -202,7 +213,7 @@ async def delete_mcp_server(
             detail=f"MCP server with ID {mcp_server_id} not found"
         )
 
-    context.db_session.commit()
+    await context.db_session.commit()
 
 
 @router.post("/{mcp_server_id}/tools/{tool_function_id}")
@@ -214,7 +225,7 @@ async def add_tool_to_mcp_server(
     """
     Add a tool to an MCP server's allowed tools list.
     """
-    mcp_server = crud.mcp_servers.get_mcp_server_by_id(context.db_session, mcp_server_id)
+    mcp_server = await crud.mcp_servers.get_mcp_server_by_id(context.db_session, mcp_server_id)
 
     if not mcp_server:
         raise HTTPException(
@@ -222,13 +233,13 @@ async def add_tool_to_mcp_server(
             detail=f"MCP server with ID {mcp_server_id} not found"
         )
 
-    crud.mcp_servers.add_tool_to_mcp_server(
+    await crud.mcp_servers.add_tool_to_mcp_server(
         context.db_session,
         mcp_server,
         tool_function_id,
     )
 
-    context.db_session.commit()
+    await context.db_session.commit()
 
 
 @router.delete("/{mcp_server_id}/tools/{tool_function_id}")
@@ -240,7 +251,7 @@ async def remove_tool_from_mcp_server(
     """
     Remove a tool from an MCP server's allowed tools list.
     """
-    mcp_server = crud.mcp_servers.get_mcp_server_by_id(context.db_session, mcp_server_id)
+    mcp_server = await crud.mcp_servers.get_mcp_server_by_id(context.db_session, mcp_server_id)
 
     if not mcp_server:
         raise HTTPException(
@@ -248,13 +259,13 @@ async def remove_tool_from_mcp_server(
             detail=f"MCP server with ID {mcp_server_id} not found"
         )
 
-    crud.mcp_servers.remove_tool_from_mcp_server(
+    await crud.mcp_servers.remove_tool_from_mcp_server(
         context.db_session,
         mcp_server,
         tool_function_id,
     )
 
-    context.db_session.commit()
+    await context.db_session.commit()
 
 
 @router.api_route("/{link}/mcp", methods=["GET", "POST", "PUT", "DELETE", "PATCH"], include_in_schema=False)

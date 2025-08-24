@@ -1,5 +1,5 @@
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from aci.common.db.sql_models import ProcessedStripeEvent
 from aci.common.logging_setup import get_logger
@@ -7,7 +7,7 @@ from aci.common.logging_setup import get_logger
 logger = get_logger(__name__)
 
 
-def record_processed_event(db_session: Session, event_id: str) -> ProcessedStripeEvent:
+async def record_processed_event(db_session: AsyncSession, event_id: str) -> ProcessedStripeEvent:
     """
     Create a new processed Stripe event record.
 
@@ -20,12 +20,12 @@ def record_processed_event(db_session: Session, event_id: str) -> ProcessedStrip
     """
     processed_event = ProcessedStripeEvent(event_id=event_id)
     db_session.add(processed_event)
-    db_session.flush()
-    db_session.refresh(processed_event)
+    await db_session.flush()
+    await db_session.refresh(processed_event)
     return processed_event
 
 
-def is_event_processed(db_session: Session, event_id: str) -> bool:
+async def is_event_processed(db_session: AsyncSession, event_id: str) -> bool:
     """
     Check if a Stripe event has already been processed.
 
@@ -37,5 +37,5 @@ def is_event_processed(db_session: Session, event_id: str) -> bool:
         True if the event has already been processed, False otherwise.
     """
     statement = select(ProcessedStripeEvent).filter_by(event_id=event_id)
-    result = db_session.execute(statement).scalar_one_or_none()
-    return result is not None
+    result = await db_session.execute(statement)
+    return result.scalar_one_or_none() is not None

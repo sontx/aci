@@ -2,7 +2,7 @@ from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import distinct, exists, func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from aci.common import validators
 from aci.common.db.sql_models import App, LinkedAccount, Project
@@ -18,8 +18,8 @@ from aci.common.schemas.security_scheme import (
 logger = get_logger(__name__)
 
 
-def get_linked_accounts(
-    db_session: Session,
+async def get_linked_accounts(
+    db_session: AsyncSession,
     project_id: UUID,
     app_name: str | None,
     linked_account_owner_id: str | None,
@@ -33,11 +33,12 @@ def get_linked_accounts(
             LinkedAccount.linked_account_owner_id == linked_account_owner_id
         )
 
-    return list(db_session.execute(statement).scalars().all())
+    result = await db_session.execute(statement)
+    return list(result.scalars().all())
 
 
-def get_linked_account(
-    db_session: Session, project_id: UUID, app_name: str, linked_account_owner_id: str
+async def get_linked_account(
+    db_session: AsyncSession, project_id: UUID, app_name: str, linked_account_owner_id: str
 ) -> LinkedAccount | None:
     statement = (
         select(LinkedAccount)
@@ -48,37 +49,40 @@ def get_linked_account(
             LinkedAccount.linked_account_owner_id == linked_account_owner_id,
         )
     )
-    linked_account: LinkedAccount | None = db_session.execute(statement).scalar_one_or_none()
+    result = await db_session.execute(statement)
+    linked_account: LinkedAccount | None = result.scalar_one_or_none()
 
     return linked_account
 
 
-def get_linked_accounts_by_app_id(db_session: Session, app_id: UUID) -> list[LinkedAccount]:
+async def get_linked_accounts_by_app_id(db_session: AsyncSession, app_id: UUID) -> list[LinkedAccount]:
     statement = select(LinkedAccount).filter_by(app_id=app_id)
-    linked_accounts: list[LinkedAccount] = list(db_session.execute(statement).scalars().all())
+    result = await db_session.execute(statement)
+    linked_accounts: list[LinkedAccount] = list(result.scalars().all())
     return linked_accounts
 
 
 # TODO: the access control (project_id check) should probably be done at the route level?
-def get_linked_account_by_id_under_project(
-    db_session: Session, linked_account_id: UUID, project_id: UUID
+async def get_linked_account_by_id_under_project(
+    db_session: AsyncSession, linked_account_id: UUID, project_id: UUID
 ) -> LinkedAccount | None:
     """Get a linked account by its id, with optional project filter
     - linked_account_id uniquely identifies a linked account across the platform.
     - project_id is extra precaution useful for access control, the linked account must belong to the project.
     """
     statement = select(LinkedAccount).filter_by(id=linked_account_id, project_id=project_id)
-    linked_account: LinkedAccount | None = db_session.execute(statement).scalar_one_or_none()
+    result = await db_session.execute(statement)
+    linked_account: LinkedAccount | None = result.scalar_one_or_none()
     return linked_account
 
 
-def delete_linked_account(db_session: Session, linked_account: LinkedAccount) -> None:
-    db_session.delete(linked_account)
-    db_session.flush()
+async def delete_linked_account(db_session: AsyncSession, linked_account: LinkedAccount) -> None:
+    await db_session.delete(linked_account)
+    await db_session.flush()
 
 
-def create_linked_account(
-    db_session: Session,
+async def create_linked_account(
+    db_session: AsyncSession,
     project_id: UUID,
     app_name: str,
     description: str | None,
@@ -94,7 +98,8 @@ def create_linked_account(
     when security_credentials is None, the linked account will be using App's default security credentials if exists
     # TODO: there is some ambiguity with "no auth" and "use app's default credentials", needs a refactor.
     """
-    app_id = db_session.execute(select(App.id).filter_by(name=app_name)).scalar_one()
+    result = await db_session.execute(select(App.id).filter_by(name=app_name))
+    app_id = result.scalar_one()
     linked_account = LinkedAccount(
         project_id=project_id,
         app_id=app_id,
@@ -107,13 +112,13 @@ def create_linked_account(
         enabled=enabled,
     )
     db_session.add(linked_account)
-    db_session.flush()
-    db_session.refresh(linked_account)
+    await db_session.flush()
+    await db_session.refresh(linked_account)
     return linked_account
 
 
-def update_linked_account_credentials(
-    db_session: Session,
+async def update_linked_account_credentials(
+    db_session: AsyncSession,
     linked_account: LinkedAccount,
     security_credentials: OAuth2SchemeCredentials
     | APIKeySchemeCredentials
@@ -129,13 +134,13 @@ def update_linked_account_credentials(
     )
 
     linked_account.security_credentials = security_credentials.model_dump(mode="json")
-    db_session.flush()
-    db_session.refresh(linked_account)
+    await db_session.flush()
+    await db_session.refresh(linked_account)
     return linked_account
 
 
-def update_linked_account(
-    db_session: Session,
+async def update_linked_account(
+    db_session: AsyncSession,
     linked_account: LinkedAccount,
     linked_account_update: LinkedAccountUpdate,
 ) -> LinkedAccount:
@@ -143,36 +148,37 @@ def update_linked_account(
         linked_account.enabled = linked_account_update.enabled
     if linked_account_update.description is not None:
         linked_account.description = linked_account_update.description
-    db_session.flush()
-    db_session.refresh(linked_account)
+    await db_session.flush()
+    await db_session.refresh(linked_account)
     return linked_account
 
 
-def update_linked_account_last_used_at(
-    db_session: Session,
+async def update_linked_account_last_used_at(
+    db_session: AsyncSession,
     last_used_at: datetime,
     linked_account: LinkedAccount,
 ) -> LinkedAccount:
     linked_account.last_used_at = last_used_at
-    db_session.flush()
-    db_session.refresh(linked_account)
+    await db_session.flush()
+    await db_session.refresh(linked_account)
     return linked_account
 
 
-def delete_linked_accounts(db_session: Session, project_id: UUID, app_name: str) -> int:
+async def delete_linked_accounts(db_session: AsyncSession, project_id: UUID, app_name: str) -> int:
     statement = (
         select(LinkedAccount)
         .join(App, LinkedAccount.app_id == App.id)
         .filter(LinkedAccount.project_id == project_id, App.name == app_name)
     )
-    linked_accounts_to_delete = db_session.execute(statement).scalars().all()
+    result = await db_session.execute(statement)
+    linked_accounts_to_delete = result.scalars().all()
     for linked_account in linked_accounts_to_delete:
-        db_session.delete(linked_account)
-    db_session.flush()
+        await db_session.delete(linked_account)
+    await db_session.flush()
     return len(linked_accounts_to_delete)
 
 
-def get_total_number_of_unique_linked_account_owner_ids(db_session: Session, org_id: UUID) -> int:
+async def get_total_number_of_unique_linked_account_owner_ids(db_session: AsyncSession, org_id: UUID) -> int:
     """
     TODO: Add a lock to prevent the race condition.
     Get the total number of unique linked account owner IDs for an organization.
@@ -188,11 +194,12 @@ def get_total_number_of_unique_linked_account_owner_ids(db_session: Session, org
     statement = select(func.count(distinct(LinkedAccount.linked_account_owner_id))).where(
         LinkedAccount.project_id.in_(select(Project.id).filter(Project.org_id == org_id))
     )
-    return db_session.execute(statement).scalar_one()
+    result = await db_session.execute(statement)
+    return result.scalar_one()
 
 
-def linked_account_owner_id_exists_in_org(
-    db_session: Session, org_id: UUID, linked_account_owner_id: str
+async def linked_account_owner_id_exists_in_org(
+    db_session: AsyncSession, org_id: UUID, linked_account_owner_id: str
 ) -> bool:
     statement = select(
         exists().where(
@@ -200,4 +207,5 @@ def linked_account_owner_id_exists_in_org(
             LinkedAccount.project_id.in_(select(Project.id).filter(Project.org_id == org_id)),
         )
     )
-    return db_session.execute(statement).scalar() or False
+    result = await db_session.execute(statement)
+    return result.scalar() or False

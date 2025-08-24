@@ -1,7 +1,7 @@
 import time
 
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from aci.common.db import crud
 from aci.common.db.sql_models import App, AppConfiguration, LinkedAccount
@@ -49,8 +49,8 @@ async def get_security_credentials(
         )
 
 
-def update_security_credentials(
-    db_session: Session,
+async def update_security_credentials(
+    db_session: AsyncSession,
     app: App,
     linked_account: LinkedAccount,
     security_credentials_response: SecurityCredentialsResponse,
@@ -68,20 +68,20 @@ def update_security_credentials(
         return
 
     if security_credentials_response.is_app_default_credentials:
-        crud.apps.update_app_default_security_credentials(
+        await crud.apps.update_app_default_security_credentials(
             db_session,
             app,
             linked_account.security_scheme,
             security_credentials_response.credentials.model_dump(),
         )
     else:
-        crud.linked_accounts.update_linked_account_credentials(
+        await crud.linked_accounts.update_linked_account_credentials(
             db_session,
             linked_account,
             security_credentials=security_credentials_response.credentials,
         )
 
-    db_session.refresh(linked_account)
+    await db_session.refresh(linked_account)
 
 
 async def _get_oauth2_credentials(

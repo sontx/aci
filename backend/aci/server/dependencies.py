@@ -1,5 +1,5 @@
 from collections.abc import Generator
-from typing import Annotated, Optional
+from typing import Annotated, Optional, Any, AsyncGenerator
 from typing import Callable
 from uuid import UUID
 
@@ -8,7 +8,7 @@ from fastapi import Request, HTTPException, status
 from fastapi.security import APIKeyHeader, HTTPBearer, HTTPAuthorizationCredentials
 from propelauth_py import User, UnknownLoginMethod
 from propelauth_py.user import OrgMemberInfo
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from aci.common import utils
 from aci.common.db import crud
@@ -53,21 +53,21 @@ def extract_org_id(user: User, prefer_org_id: str):
 
 
 class RequestContext:
-    def __init__(self, user: User, project: Project, db_session: Session):
+    def __init__(self, user: User, project: Project, db_session: AsyncSession):
         self.user = user
         self.db_session = db_session
         self.project = project
 
 
 class RequestContext2(RequestContext):
-    def __init__(self, user: User, project: Project, db_session: Session, api_key_name: Optional[str] = None):
+    def __init__(self, user: User, project: Project, db_session: AsyncSession, api_key_name: Optional[str] = None):
         super().__init__(user, project, db_session)
         self.api_key_name = api_key_name
 
 
 class APIKeyContext:
     def __init__(
-            self, db_session: Session,
+            self, db_session: AsyncSession,
             project: Project | None = None,
             api_key_name: str | None = None,
             api_key_id: UUID | None = None
@@ -78,20 +78,29 @@ class APIKeyContext:
         self.api_key_id = api_key_id
 
 
-def yield_db_session() -> Generator[Session, None, None]:
-    db_session = utils.create_db_session(config.DB_FULL_URL)
+async def yield_db_async_session() -> AsyncGenerator[AsyncSession, None]:
+    db_session = utils.create_db_async_session(config.DB_FULL_URL)
     try:
         yield db_session
     finally:
-        db_session.close()
+        await db_session.close()
 
 
-def validate_api_key(
-        db_session: Annotated[Session, Depends(yield_db_session)],
+async def yield_db_async_session2() -> AsyncGenerator[AsyncSession, None]:
+    db_session = utils.create_db_async_session(config.DB_FULL_URL,
+                                               expire_on_commit=False)  # expire_on_commit is false for multiple commits
+    try:
+        yield db_session
+    finally:
+        await db_session.close()
+
+
+async def validate_api_key(
+        db_session: Annotated[AsyncSession, Depends(yield_db_async_session)],
         api_key_key: Annotated[str, Security(api_key_header)],
 ) -> UUID:
     """Validate API key and return the API key ID. (not the actual API key string)"""
-    api_key = crud.projects.get_api_key(db_session, api_key_key)
+    api_key = await crud.projects.get_api_key(db_session, api_key_key)
     if api_key is None:
         logger.error(f"API key not found, partial_api_key={api_key_key[:4]}****{api_key_key[-4:]}")
         raise InvalidAPIKey("api key not found")
@@ -123,9 +132,9 @@ def get_header(header_name: str, optional=False) -> Callable:
     return dependency
 
 
-def get_request_context(
+async def get_request_context(
         user: Annotated[User, Depends(auth.require_user)],
-        db_session: Annotated[Session, Depends(yield_db_session)],
+        db_session: Annotated[AsyncSession, Depends(yield_db_async_session)],
         prefer_org_id: UUID = Depends(get_header(ACI_ORG_ID_HEADER)),
         project_id: UUID = Depends(get_header(ACI_PROJECT_ID_HEADER)),
 ) -> RequestContext:
@@ -133,7 +142,7 @@ def get_request_context(
     Returns a RequestContext object containing the DB session,
     the validated API key ID, and the project ID.
     """
-    project = crud.projects.get_project(db_session, project_id)
+    project = await crud.projects.get_project(db_session, project_id)
     if not project:
         logger.error(f"Project not found, project_id={project_id}")
         raise ProjectNotFound(f"Project not found, project_id={project_id}")
@@ -160,8 +169,8 @@ def get_request_context(
     )
 
 
-def get_request_context2(
-        db_session: Annotated[Session, Depends(yield_db_session)],
+async def get_request_context2(
+        db_session: Annotated[AsyncSession, Depends(yield_db_async_session)],
         jwt_token: Annotated[Optional[HTTPAuthorizationCredentials], Security(http_bearer)] = None,
         api_key: Annotated[Optional[str], Security(api_key_header)] = None,
         prefer_org_id: UUID | None = Depends(get_header(ACI_ORG_ID_HEADER, optional=True)),
@@ -174,7 +183,7 @@ def get_request_context2(
 
     # Try API key authentication first
     if api_key:
-        api_key_context = get_api_key_context(
+        api_key_context = await get_api_key_context(
             db_session=db_session,
             api_key=api_key,
         )
@@ -219,7 +228,7 @@ def get_request_context2(
             )
 
         user = auth.require_user(jwt_token)
-        context = get_request_context(user, db_session, prefer_org_id, project_id)
+        context = await get_request_context(user, db_session, prefer_org_id, project_id)
         return RequestContext2(
             user=context.user,
             project=context.project,
@@ -233,8 +242,8 @@ def get_request_context2(
         )
 
 
-def get_api_key_context(
-        db_session: Annotated[Session, Depends(yield_db_session)],
+async def get_api_key_context(
+        db_session: Annotated[AsyncSession, Depends(yield_db_async_session2)],
         api_key: Annotated[Optional[str], Security(api_key_header)] = None,
 ) -> APIKeyContext:
     """
@@ -247,7 +256,7 @@ def get_api_key_context(
         )
 
     # Verify API key and extract information
-    api_key_extract = crud.api_keys.extract_api_key(
+    api_key_extract = await crud.api_keys.extract_api_key(
         db_session, api_key,
     )
 
@@ -267,7 +276,7 @@ def get_api_key_context(
 
 
 async def validate_monthly_quota(
-        db_session: Annotated[Session, Depends(yield_db_session)],
+        db_session: Annotated[AsyncSession, Depends(yield_db_async_session2)],
         jwt_token: Annotated[Optional[HTTPAuthorizationCredentials], Security(http_bearer)] = None,
         api_key: Annotated[Optional[str], Security(api_key_header)] = None,
         prefer_org_id: UUID = Depends(get_header(ACI_ORG_ID_HEADER, optional=True)),
@@ -281,7 +290,7 @@ async def validate_monthly_quota(
     3. Increment usage or raise error if exceeded
     """
 
-    context = get_request_context2(
+    context = await get_request_context2(
         db_session=db_session,
         jwt_token=jwt_token,
         api_key=api_key,

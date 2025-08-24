@@ -8,7 +8,7 @@ quotas, and other resource constraints.
 
 from uuid import UUID
 
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from aci.common.db import crud
 from aci.common.exceptions import (
@@ -23,7 +23,7 @@ from aci.server import billing, config
 logger = get_logger(__name__)
 
 
-def enforce_project_creation_quota(db_session: Session, org_id: UUID) -> None:
+async def enforce_project_creation_quota(db_session: AsyncSession, org_id: UUID) -> None:
     """
     Check and enforce that the user/organization hasn't exceeded their project creation quota
     based on their subscription plan.
@@ -36,12 +36,12 @@ def enforce_project_creation_quota(db_session: Session, org_id: UUID) -> None:
         MaxProjectsReached: If the user has reached their maximum allowed projects
         SubscriptionPlanNotFound: If the organization's subscription plan cannot be found
     """
-    active_plan = billing.get_active_plan_by_org_id(db_session, org_id)
+    active_plan = await billing.get_active_plan_by_org_id(db_session, org_id)
 
     # Get the projects quota from the plan's features
     max_projects = active_plan.features["projects"]
 
-    projects = crud.projects.get_projects_by_org(db_session, org_id)
+    projects = await crud.projects.get_projects_by_org(db_session, org_id)
     if len(projects) >= max_projects:
         logger.error(
             f"User/organization has reached maximum projects quota for their plan, "
@@ -53,8 +53,8 @@ def enforce_project_creation_quota(db_session: Session, org_id: UUID) -> None:
         )
 
 
-def enforce_linked_accounts_creation_quota(
-    db_session: Session, org_id: UUID, linked_account_owner_id: str
+async def enforce_linked_accounts_creation_quota(
+    db_session: AsyncSession, org_id: UUID, linked_account_owner_id: str
 ) -> None:
     """
     Check and enforce that the organization doesn't have a unique_account_owner_id exceeding the
@@ -70,7 +70,7 @@ def enforce_linked_accounts_creation_quota(
         allowed unique linked account owner ids
         SubscriptionPlanNotFound: If the organization's subscription plan cannot be found
     """
-    if crud.linked_accounts.linked_account_owner_id_exists_in_org(
+    if await crud.linked_accounts.linked_account_owner_id_exists_in_org(
         db_session, org_id, linked_account_owner_id
     ):
         # If the linked account owner id already exists in the organization, linking this account
@@ -78,13 +78,13 @@ def enforce_linked_accounts_creation_quota(
         return
 
     # Get the plan for the organization
-    active_plan = billing.get_active_plan_by_org_id(db_session, org_id)
+    active_plan = await billing.get_active_plan_by_org_id(db_session, org_id)
 
     # Get the linked accounts quota from the plan's features
     max_unique_linked_account_owner_ids = active_plan.features["linked_accounts"]
 
     num_unique_linked_account_owner_ids = (
-        crud.linked_accounts.get_total_number_of_unique_linked_account_owner_ids(db_session, org_id)
+        await crud.linked_accounts.get_total_number_of_unique_linked_account_owner_ids(db_session, org_id)
     )
     if num_unique_linked_account_owner_ids >= max_unique_linked_account_owner_ids:
         logger.error(
@@ -99,7 +99,7 @@ def enforce_linked_accounts_creation_quota(
         )
 
 
-def enforce_agent_secrets_quota(db_session: Session, project_id: UUID) -> None:
+async def enforce_agent_secrets_quota(db_session: AsyncSession, project_id: UUID) -> None:
     """
     Check and enforce that the project hasn't exceeded its agent secrets quota.
     The quota is determined by the organization's current subscription plan.
@@ -114,7 +114,7 @@ def enforce_agent_secrets_quota(db_session: Session, project_id: UUID) -> None:
         ProjectNotFound: If the project cannot be found
     """
     # Get the project
-    project = crud.projects.get_project(db_session, project_id)
+    project = await crud.projects.get_project(db_session, project_id)
     if not project:
         logger.error(
             f"Project not found during agent secrets quota enforcement project_id={project_id}"
@@ -122,13 +122,13 @@ def enforce_agent_secrets_quota(db_session: Session, project_id: UUID) -> None:
         raise ProjectNotFound(f"Project {project_id} not found")
 
     # Get the plan for the organization
-    active_plan = billing.get_active_plan_by_org_id(db_session, project.org_id)
+    active_plan = await billing.get_active_plan_by_org_id(db_session, project.org_id)
 
     # Get the agent secrets quota from the plan's features
     max_agent_secrets = active_plan.features["agent_credentials"]
 
     # Count the number of agent secrets for the project
-    num_agent_secrets = crud.secret.get_total_number_of_agent_secrets_for_org(
+    num_agent_secrets = await crud.secret.get_total_number_of_agent_secrets_for_org(
         db_session, project.org_id
     )
     if num_agent_secrets >= max_agent_secrets:

@@ -3,7 +3,7 @@ from uuid import UUID
 
 from authlib.jose import jwt
 from fastapi import APIRouter, Body, Depends, Query, Request, status
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import RedirectResponse
 
 from aci.common.db import crud
@@ -73,7 +73,7 @@ There are a few tricky parts:
 async def link_account_with_aci_default_credentials(
     context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
     body: Annotated[LinkedAccountDefaultCreate, Body()],
-) -> LinkedAccount:
+) -> LinkedAccountPublic:
     """
     Create a linked account under an App using default credentials (e.g., API key, OAuth2, etc.)
     provided by ACI.
@@ -86,7 +86,7 @@ async def link_account_with_aci_default_credentials(
         f"linked_account_owner_id={body.linked_account_owner_id}"
     )
     # TODO: some duplicate code with other linked account creation routes
-    app_configuration = crud.app_configurations.get_app_configuration(
+    app_configuration = await crud.app_configurations.get_app_configuration(
         context.db_session, context.project.id, body.app_name
     )
     if not app_configuration:
@@ -98,7 +98,7 @@ async def link_account_with_aci_default_credentials(
             f"configuration for app={body.app_name} not found, please configure the app first {config.DEV_PORTAL_URL}/apps/{body.app_name}"
         )
 
-    # need to make sure the App actully has default credentials provided by ACI
+    # need to make sure the App actually has default credentials provided by ACI
     app_default_credentials = app_configuration.app.default_security_credentials_by_scheme.get(
         app_configuration.security_scheme
     )
@@ -114,7 +114,7 @@ async def link_account_with_aci_default_credentials(
             f"security_scheme={app_configuration.security_scheme}"
         )
 
-    linked_account = crud.linked_accounts.get_linked_account(
+    linked_account = await crud.linked_accounts.get_linked_account(
         context.db_session,
         context.project.id,
         body.app_name,
@@ -134,7 +134,7 @@ async def link_account_with_aci_default_credentials(
         )
     else:
         # Enforce linked accounts quota before creating new account
-        quota_manager.enforce_linked_accounts_creation_quota(
+        await quota_manager.enforce_linked_accounts_creation_quota(
             context.db_session, context.project.org_id, body.linked_account_owner_id
         )
 
@@ -143,7 +143,7 @@ async def link_account_with_aci_default_credentials(
             f"linked_account_owner_id={body.linked_account_owner_id}, "
             f"app_name={body.app_name}"
         )
-        linked_account = crud.linked_accounts.create_linked_account(
+        linked_account = await crud.linked_accounts.create_linked_account(
             context.db_session,
             context.project.id,
             body.app_name,
@@ -152,16 +152,33 @@ async def link_account_with_aci_default_credentials(
             app_configuration.security_scheme,
             enabled=True,
         )
-    context.db_session.commit()
 
-    return linked_account
+    linked_account_public = await _to_linked_account_public(linked_account)
+    await context.db_session.commit()
+    return linked_account_public
 
+
+async def _to_linked_account_public(
+    linked_account: LinkedAccount,
+) -> LinkedAccountPublic:
+    return LinkedAccountPublic(
+        id=linked_account.id,
+        project_id=linked_account.project_id,
+        app_name=(await linked_account.awaitable_attrs.app).name,
+        linked_account_owner_id=linked_account.linked_account_owner_id,
+        description=linked_account.description,
+        security_scheme=linked_account.security_scheme,
+        enabled=linked_account.enabled,
+        created_at=linked_account.created_at,
+        updated_at=linked_account.updated_at,
+        last_used_at=linked_account.last_used_at,
+    )
 
 @router.post("/no-auth", response_model=LinkedAccountPublic)
 async def link_account_with_no_auth(
     context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
     body: LinkedAccountNoAuthCreate,
-) -> LinkedAccount:
+) -> LinkedAccountPublic:
     """
     Create a linked account under an App that requires no authentication.
     """
@@ -170,7 +187,7 @@ async def link_account_with_no_auth(
         f"linked_account_owner_id={body.linked_account_owner_id}"
     )
     # TODO: duplicate code with other linked account creation routes, refactor later
-    app_configuration = crud.app_configurations.get_app_configuration(
+    app_configuration = await crud.app_configurations.get_app_configuration(
         context.db_session, context.project.id, body.app_name
     )
     if not app_configuration:
@@ -189,7 +206,7 @@ async def link_account_with_no_auth(
             f"the security_scheme configured for app={body.app_name} is "
             f"{app_configuration.security_scheme}, not no_auth"
         )
-    linked_account = crud.linked_accounts.get_linked_account(
+    linked_account = await crud.linked_accounts.get_linked_account(
         context.db_session,
         context.project.id,
         body.app_name,
@@ -205,7 +222,7 @@ async def link_account_with_no_auth(
         )
     else:
         # Enforce linked accounts quota before creating new account
-        quota_manager.enforce_linked_accounts_creation_quota(
+        await quota_manager.enforce_linked_accounts_creation_quota(
             context.db_session, context.project.org_id, body.linked_account_owner_id
         )
 
@@ -214,7 +231,7 @@ async def link_account_with_no_auth(
             f"linked_account_owner_id={body.linked_account_owner_id}, "
             f"app_name={body.app_name}"
         )
-        linked_account = crud.linked_accounts.create_linked_account(
+        linked_account = await crud.linked_accounts.create_linked_account(
             context.db_session,
             context.project.id,
             body.app_name,
@@ -225,16 +242,16 @@ async def link_account_with_no_auth(
             enabled=True,
         )
 
-    context.db_session.commit()
-
-    return linked_account
+    linked_account_public =  await _to_linked_account_public(linked_account)
+    await context.db_session.commit()
+    return linked_account_public
 
 
 @router.post("/api-key", response_model=LinkedAccountPublic)
 async def link_account_with_api_key(
     context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
     body: LinkedAccountAPIKeyCreate,
-) -> LinkedAccount:
+) -> LinkedAccountPublic:
     """
     Create a linked account under an API key based App.
     """
@@ -242,7 +259,7 @@ async def link_account_with_api_key(
         f"Linking api_key account, app_name={body.app_name}, "
         f"linked_account_owner_id={body.linked_account_owner_id}"
     )
-    app_configuration = crud.app_configurations.get_app_configuration(
+    app_configuration = await crud.app_configurations.get_app_configuration(
         context.db_session, context.project.id, body.app_name
     )
     if not app_configuration:
@@ -265,7 +282,7 @@ async def link_account_with_api_key(
             f"the security_scheme configured for app={body.app_name} is "
             f"{app_configuration.security_scheme}, not api_key"
         )
-    linked_account = crud.linked_accounts.get_linked_account(
+    linked_account = await crud.linked_accounts.get_linked_account(
         context.db_session,
         context.project.id,
         body.app_name,
@@ -287,7 +304,7 @@ async def link_account_with_api_key(
         )
     else:
         # Enforce linked accounts quota before creating new account
-        quota_manager.enforce_linked_accounts_creation_quota(
+        await quota_manager.enforce_linked_accounts_creation_quota(
             context.db_session, context.project.org_id, body.linked_account_owner_id
         )
 
@@ -296,7 +313,7 @@ async def link_account_with_api_key(
             f"linked_account_owner_id={body.linked_account_owner_id}, "
             f"app_name={body.app_name}"
         )
-        linked_account = crud.linked_accounts.create_linked_account(
+        linked_account = await crud.linked_accounts.create_linked_account(
             context.db_session,
             context.project.id,
             body.app_name,
@@ -307,9 +324,9 @@ async def link_account_with_api_key(
             enabled=True,
         )
 
-    context.db_session.commit()
-
-    return linked_account
+    linked_account_public =  await _to_linked_account_public(linked_account)
+    await context.db_session.commit()
+    return linked_account_public
 
 
 @router.get("/oauth2")
@@ -322,7 +339,7 @@ async def link_oauth2_account(
     Start an OAuth2 account linking process.
     It will return a redirect url (as a string, instead of RedirectResponse) to the OAuth2 provider's authorization endpoint.
     """
-    app_configuration = crud.app_configurations.get_app_configuration(
+    app_configuration = await crud.app_configurations.get_app_configuration(
         context.db_session, context.project.id, query_params.app_name
     )
     if not app_configuration:
@@ -346,7 +363,7 @@ async def link_oauth2_account(
         )
 
     # Enforce linked accounts quota before creating new account
-    quota_manager.enforce_linked_accounts_creation_quota(
+    await quota_manager.enforce_linked_accounts_creation_quota(
         context.db_session, context.project.org_id, query_params.linked_account_owner_id
     )
 
@@ -410,8 +427,8 @@ async def link_oauth2_account(
 )
 async def linked_accounts_oauth2_callback(
     request: Request,
-    db_session: Annotated[Session, Depends(deps.yield_db_session)],
-) -> LinkedAccount | RedirectResponse:
+    db_session: Annotated[AsyncSession, Depends(deps.yield_db_async_session)],
+) -> LinkedAccountPublic | RedirectResponse:
     """
     Callback endpoint for OAuth2 account linking.
     - A linked account (with necessary credentials from the OAuth2 provider) will be created in the database.
@@ -455,7 +472,7 @@ async def linked_accounts_oauth2_callback(
         raise AuthenticationError("invalid state parameter during account linking") from e
 
     # check if the app exists
-    app = crud.apps.get_app(db_session, state.app_name, False, False)
+    app = await crud.apps.get_app(db_session, state.app_name, False, False)
     if not app:
         logger.error(
             f"Unable to continue with account linking, app not found app_name={state.app_name}"
@@ -466,7 +483,7 @@ async def linked_accounts_oauth2_callback(
     # - exists
     # - configuration is OAuth2
     # - client_id matches the one used at the start of the OAuth2 flow
-    app_configuration = crud.app_configurations.get_app_configuration(
+    app_configuration = await crud.app_configurations.get_app_configuration(
         db_session, state.project_id, state.app_name
     )
     if not app_configuration:
@@ -517,7 +534,7 @@ async def linked_accounts_oauth2_callback(
     # TODO: consider separating the logic for updating and creating a linked account or give warning to clients
     # if the linked account already exists to avoid accidental overwriting the account
     # TODO: try/except, retry?
-    linked_account = crud.linked_accounts.get_linked_account(
+    linked_account = await crud.linked_accounts.get_linked_account(
         db_session,
         state.project_id,
         state.app_name,
@@ -527,12 +544,12 @@ async def linked_accounts_oauth2_callback(
         logger.info(
             f"Updating oauth2 credentials for linked account, linked_account_id={linked_account.id}"
         )
-        linked_account = crud.linked_accounts.update_linked_account_credentials(
+        linked_account = await crud.linked_accounts.update_linked_account_credentials(
             db_session, linked_account, security_credentials
         )
     else:
         # Get the organization ID from the project
-        project = crud.projects.get_project(db_session, state.project_id)
+        project = await crud.projects.get_project(db_session, state.project_id)
         if not project:
             logger.error(
                 f"project not found when creating linked account project_id={state.project_id}"
@@ -540,7 +557,7 @@ async def linked_accounts_oauth2_callback(
             raise ProjectNotFound(f"Project with ID {state.project_id} not found")
         org_id = project.org_id
         # Enforce linked accounts quota before creating new account
-        quota_manager.enforce_linked_accounts_creation_quota(
+        await quota_manager.enforce_linked_accounts_creation_quota(
             db_session, org_id, state.linked_account_owner_id
         )
 
@@ -549,7 +566,7 @@ async def linked_accounts_oauth2_callback(
             f"app_name={state.app_name}, "
             f"linked_account_owner_id={state.linked_account_owner_id}"
         )
-        linked_account = crud.linked_accounts.create_linked_account(
+        linked_account = await crud.linked_accounts.create_linked_account(
             db_session,
             project_id=state.project_id,
             app_name=state.app_name,
@@ -559,14 +576,16 @@ async def linked_accounts_oauth2_callback(
             security_credentials=security_credentials,
             enabled=True,
         )
-    db_session.commit()
 
     if state.after_oauth2_link_redirect_url:
+        await db_session.commit()
         return RedirectResponse(
             url=state.after_oauth2_link_redirect_url, status_code=status.HTTP_302_FOUND
         )
 
-    return linked_account
+    linked_account_public =  await _to_linked_account_public(linked_account)
+    await db_session.commit()
+    return linked_account_public
 
 
 # TODO: add pagination
@@ -574,7 +593,7 @@ async def linked_accounts_oauth2_callback(
 async def list_linked_accounts(
     context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
     query_params: Annotated[LinkedAccountsList, Query()],
-) -> list[LinkedAccount]:
+) -> list[LinkedAccountPublic]:
     """
     List all linked accounts.
     - Optionally filter by app_name and linked_account_owner_id.
@@ -582,14 +601,14 @@ async def list_linked_accounts(
     - This can be an alternatively way to GET /linked-accounts/{linked_account_id} for getting a specific linked account.
     """
 
-    linked_accounts = crud.linked_accounts.get_linked_accounts(
+    linked_accounts = await crud.linked_accounts.get_linked_accounts(
         context.db_session,
         context.project.id,
         query_params.app_name,
         query_params.linked_account_owner_id,
     )
 
-    return linked_accounts
+    return [await _to_linked_account_public(la) for la in linked_accounts]
 
 @router.get("/get-by-owner-id", response_model=LinkedAccountWithCredentials,
     response_model_exclude_none=True,
@@ -598,14 +617,14 @@ async def get_linked_accounts_by_owner_id(
     context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
     owner_id: str = Query(description="The owner ID of the linked account"),
     app_name: str = Query(description="The app name of the linked account"),
-) -> LinkedAccount:
+) -> LinkedAccountPublic:
     """
     Get a linked account by its owner ID and app name.
     - owner_id uniquely identifies a linked account across the platform.
     - app_name is the name of the app the linked account is associated with.
     """
     logger.info(f"Get linked account by owner_id, owner_id={owner_id}, app_name={app_name}")
-    linked_accounts = crud.linked_accounts.get_linked_accounts(
+    linked_accounts = await crud.linked_accounts.get_linked_accounts(
         context.db_session,
         context.project.id,
         app_name=app_name,
@@ -619,7 +638,7 @@ async def get_linked_accounts_by_owner_id(
         )
 
     # Get the first linked account
-    return linked_accounts[0]
+    return await _to_linked_account_public(linked_accounts[0])
 
 
 @router.get(
@@ -630,14 +649,14 @@ async def get_linked_accounts_by_owner_id(
 async def get_linked_account(
     context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
     linked_account_id: UUID,
-) -> LinkedAccount:
+) -> LinkedAccountWithCredentials:
     """
     Get a linked account by its id.
     - linked_account_id uniquely identifies a linked account across the platform.
     """
     logger.info(f"Get linked account, linked_account_id={linked_account_id}")
     # validations
-    linked_account = crud.linked_accounts.get_linked_account_by_id_under_project(
+    linked_account = await crud.linked_accounts.get_linked_account_by_id_under_project(
         context.db_session, linked_account_id, context.project.id
     )
     if not linked_account:
@@ -645,30 +664,34 @@ async def get_linked_account(
         raise LinkedAccountNotFound(f"linked account={linked_account_id} not found")
 
     # Get the app configuration to check and refresh credentials if needed
-    app_configuration = crud.app_configurations.get_app_configuration(
-        context.db_session, context.project.id, linked_account.app.name
+    app = await linked_account.awaitable_attrs.app
+    app_configuration = await crud.app_configurations.get_app_configuration(
+        context.db_session, context.project.id, app.name
     )
     if not app_configuration:
         logger.error(
             "app configuration not found",
         )
         raise AppConfigurationNotFound(
-            f"app configuration for app={linked_account.app.name} not found"
+            f"app configuration for app={app.name} not found"
         )
 
     security_credentials_response = await scm.get_security_credentials(
-        linked_account.app, app_configuration, linked_account
+        app, app_configuration, linked_account
     )
-    scm.update_security_credentials(
-        context.db_session, linked_account.app, linked_account, security_credentials_response
+    await scm.update_security_credentials(
+        context.db_session, app, linked_account, security_credentials_response
     )
     logger.info(
         f"Fetched security credentials for linked account, linked_account_id={linked_account.id}, "
         f"is_updated={security_credentials_response.is_updated}"
     )
-    context.db_session.commit()
 
-    return linked_account
+    # Ensure the app_name is available in the linked account model before validation
+    linked_account.app_name = app.name
+    linked_account_with_credentials = LinkedAccountWithCredentials.model_validate(linked_account)
+    await context.db_session.commit()
+    return linked_account_with_credentials
 
 
 @router.delete("/{linked_account_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -680,16 +703,16 @@ async def delete_linked_account(
     Delete a linked account by its id.
     """
     logger.info(f"Delete linked account, linked_account_id={linked_account_id}")
-    linked_account = crud.linked_accounts.get_linked_account_by_id_under_project(
+    linked_account = await crud.linked_accounts.get_linked_account_by_id_under_project(
         context.db_session, linked_account_id, context.project.id
     )
     if not linked_account:
         logger.error(f"Linked account not found, linked_account_id={linked_account_id}")
         raise LinkedAccountNotFound(f"linked account={linked_account_id} not found")
 
-    crud.linked_accounts.delete_linked_account(context.db_session, linked_account)
+    await crud.linked_accounts.delete_linked_account(context.db_session, linked_account)
 
-    context.db_session.commit()
+    await context.db_session.commit()
 
 
 @router.patch("/{linked_account_id}", response_model=LinkedAccountPublic)
@@ -697,21 +720,22 @@ async def update_linked_account(
     context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
     linked_account_id: UUID,
     body: LinkedAccountUpdate,
-) -> LinkedAccount:
+) -> LinkedAccountPublic:
     """
     Update a linked account.
     """
     logger.info(f"Update linked account, linked_account_id={linked_account_id}")
-    linked_account = crud.linked_accounts.get_linked_account_by_id_under_project(
+    linked_account = await crud.linked_accounts.get_linked_account_by_id_under_project(
         context.db_session, linked_account_id, context.project.id
     )
     if not linked_account:
         logger.error(f"Linked account not found, linked_account_id={linked_account_id}")
         raise LinkedAccountNotFound(f"Linked account={linked_account_id} not found")
 
-    linked_account = crud.linked_accounts.update_linked_account(
+    linked_account = await crud.linked_accounts.update_linked_account(
         context.db_session, linked_account, body
     )
-    context.db_session.commit()
 
-    return linked_account
+    linked_account_public =  await _to_linked_account_public(linked_account)
+    await context.db_session.commit()
+    return linked_account_public

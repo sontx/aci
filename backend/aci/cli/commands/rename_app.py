@@ -2,13 +2,14 @@ import click
 from rich.console import Console
 
 from aci.cli import config
+from aci.cli.async_command import async_command
 from aci.common import utils
 from aci.common.db import crud
 
 console = Console()
 
 
-@click.command()
+@async_command()
 @click.option(
     "--current-name",
     "current_name",
@@ -26,7 +27,7 @@ console = Console()
     is_flag=True,
     help="Provide this flag to run the command and apply changes to the database",
 )
-def rename_app(
+async def rename_app(
     current_name: str,
     new_name: str,
     skip_dry_run: bool,
@@ -47,9 +48,9 @@ def rename_app(
         if not click.confirm("Are you sure you want to continue?", default=False):
             raise click.Abort()
 
-    with utils.create_db_session(config.DB_FULL_URL) as db_session:
+    async with utils.create_db_async_session(config.DB_FULL_URL) as db_session:
         # Check if old app exists
-        app = crud.apps.get_app(
+        app = await crud.apps.get_app(
             db_session,
             current_name,
             public_only=False,
@@ -59,7 +60,7 @@ def rename_app(
             raise click.ClickException(f"App '{current_name}' not found")
 
         # Check if new app name already exists
-        new_app = crud.apps.get_app(
+        new_app = await crud.apps.get_app(
             db_session,
             new_name,
             public_only=False,
@@ -69,10 +70,10 @@ def rename_app(
             raise click.ClickException(f"App with name '{new_name}' already exists")
 
         # Get functions that need to be renamed
-        functions = crud.functions.get_functions_by_app_id(db_session, app.id)
+        functions = await crud.functions.get_functions_by_app_id(db_session, app.id)
 
         # Get app configurations that need to be updated
-        app_configurations = crud.app_configurations.get_app_configurations_by_app_id(
+        app_configurations = await crud.app_configurations.get_app_configurations_by_app_id(
             db_session, app.id
         )
 
@@ -110,10 +111,10 @@ def rename_app(
                     "[bold yellow]Run with [bold green]--skip-dry-run[/bold green] to apply these changes[/bold yellow]"
                 )
             else:
-                db_session.commit()
+                await db_session.commit()
                 console.rule(
                     f"[bold green]Successfully renamed app from '{current_name}' to '{new_name}'[/bold green]"
                 )
         except Exception as e:
-            db_session.rollback()
+            await db_session.rollback()
             console.print(f"[bold red]Error renaming app: {e}[/bold red]")

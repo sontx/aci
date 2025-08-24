@@ -4,7 +4,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request, Response, status
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from svix import Webhook, WebhookVerificationError
 
 from aci.common.db import crud
@@ -24,7 +24,7 @@ auth = get_propelauth()
 @router.post("/auth/user-created", status_code=status.HTTP_204_NO_CONTENT)
 async def handle_user_created_webhook(
     request: Request,
-    db_session: Annotated[Session, Depends(deps.yield_db_session)],
+    db_session: Annotated[AsyncSession, Depends(deps.yield_db_async_session)],
     response: Response,
 ) -> None:
     headers = request.headers
@@ -102,9 +102,9 @@ async def handle_user_created_webhook(
     )
 
     org_id_uuid = _convert_org_id_to_uuid(org.org_id)
-    project = crud.projects.create_project(db_session, org_id_uuid, "Default Project")
+    project = await crud.projects.create_project(db_session, org_id_uuid, "Default Project")
 
-    db_session.commit()
+    await db_session.commit()
 
     logger.info(
         f"Created default project for new user, "

@@ -2,13 +2,14 @@ import click
 from rich.console import Console
 
 from aci.cli import config
+from aci.cli.async_command import async_command
 from aci.common import utils
 from aci.common.db import crud
 
 console = Console()
 
 
-@click.command()
+@async_command()
 @click.option(
     "--app-name",
     "app_name",
@@ -20,7 +21,7 @@ console = Console()
     is_flag=True,
     help="Provide this flag to run the command and apply changes to the database",
 )
-def delete_app(
+async def delete_app(
     app_name: str,
     skip_dry_run: bool,
 ) -> None:
@@ -45,9 +46,9 @@ def delete_app(
         if not click.confirm("Are you sure you want to continue?", default=False):
             raise click.Abort()
 
-    with utils.create_db_session(config.DB_FULL_URL) as db_session:
+    async with utils.create_db_async_session(config.DB_FULL_URL) as db_session:
         # Check if app exists
-        app = crud.apps.get_app(
+        app = await crud.apps.get_app(
             db_session,
             app_name,
             public_only=False,
@@ -57,13 +58,13 @@ def delete_app(
             raise click.ClickException(f"App '{app_name}' not found")
 
         # Get associated data that will be affected
-        functions = crud.functions.get_functions_by_app_id(db_session, app.id)
-        app_configurations = crud.app_configurations.get_app_configurations_by_app_id(
+        functions = await crud.functions.get_functions_by_app_id(db_session, app.id)
+        app_configurations = await crud.app_configurations.get_app_configurations_by_app_id(
             db_session, app.id
         )
 
         # Get linked accounts
-        linked_accounts = crud.linked_accounts.get_linked_accounts_by_app_id(db_session, app.id)
+        linked_accounts = await crud.linked_accounts.get_linked_accounts_by_app_id(db_session, app.id)
 
         if not skip_dry_run:
             console.rule("[bold yellow]Dry run mode - no changes applied[/bold yellow]")
@@ -71,14 +72,14 @@ def delete_app(
         try:
             # 1. Delete linked accounts
             for linked_account in linked_accounts:
-                db_session.delete(linked_account)
+                await db_session.delete(linked_account)
                 console.print(
                     f"Deleted linked account {linked_account.id} for project {linked_account.project_id}"
                 )
 
             # 2. Delete app configurations
             for app_config in app_configurations:
-                db_session.delete(app_config)
+                await db_session.delete(app_config)
                 console.print(
                     f"Deleted app configuration of {app_config.app_name} for project {app_config.project_id}"
                 )
@@ -88,19 +89,19 @@ def delete_app(
                 console.print(f"Function '{function.name}' will be deleted with app")
 
             # 4. Delete the app (will cascade to functions)
-            db_session.delete(app)
+            await db_session.delete(app)
             console.print(f"Deleted app '{app_name}'")
 
             # Commit changes
             if skip_dry_run:
-                db_session.commit()
+                await db_session.commit()
                 console.rule(f"[bold green]Successfully deleted app '{app_name}'[/bold green]")
             else:
                 console.rule(
                     "[bold yellow]Run with [bold green]--skip-dry-run[/bold green] to apply these changes[/bold yellow]"
                 )
-                db_session.rollback()
+                await db_session.rollback()
 
         except Exception as e:
-            db_session.rollback()
+            await db_session.rollback()
             console.print(f"[bold red]Error deleting app: {e}[/bold red]")

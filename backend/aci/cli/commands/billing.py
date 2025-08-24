@@ -2,6 +2,7 @@ import click
 from rich.console import Console
 
 from aci.cli import config
+from aci.cli.async_command import async_command
 from aci.common import utils
 from aci.common.db import crud
 from aci.common.db.sql_models import Plan
@@ -66,13 +67,13 @@ PLANS_DATA = [
 ]
 
 
-@click.command("populate-subscription-plans")
+@async_command(name="populate-subscription-plans")
 @click.option(
     "--skip-dry-run",
     is_flag=True,
     help="provide this flag to run the command and apply changes to the database",
 )
-def populate_subscription_plans(skip_dry_run: bool) -> None:
+async def populate_subscription_plans(skip_dry_run: bool) -> None:
     """
     Populates the Plan table with Starter, Team, and Growth plans.
     If plans with the same names exist, they will be updated.
@@ -80,12 +81,12 @@ def populate_subscription_plans(skip_dry_run: bool) -> None:
     """
     console.rule("[bold blue]Populating Subscription Plans[/bold blue]")
 
-    with utils.create_db_session(config.DB_FULL_URL) as db_session:
+    async with utils.create_db_async_session(config.DB_FULL_URL, expire_on_commit=False) as db_session:
         created_count = 0
         updated_count = 0
         for plan_data in PLANS_DATA:
             plan_name = str(plan_data.name)
-            existing_plan = crud.plans.get_by_name(db_session, plan_name)
+            existing_plan = await crud.plans.get_by_name(db_session, plan_name)
 
             if existing_plan:
                 # Update existing plan
@@ -97,7 +98,7 @@ def populate_subscription_plans(skip_dry_run: bool) -> None:
                     features=PlanFeatures(**plan_data.features),
                     is_public=bool(plan_data.is_public),
                 )
-                updated_plan = crud.plans.update_plan(
+                updated_plan = await crud.plans.update_plan(
                     db=db_session,
                     plan=existing_plan,
                     plan_update=plan_update_schema,
@@ -109,7 +110,7 @@ def populate_subscription_plans(skip_dry_run: bool) -> None:
             else:
                 # Create new plan
                 console.print(f"Creating new plan: {plan_name}")
-                new_plan = crud.plans.create(
+                new_plan = await crud.plans.create(
                     db=db_session,
                     name=str(plan_data.name),
                     stripe_product_id=str(plan_data.stripe_product_id),
@@ -126,14 +127,14 @@ def populate_subscription_plans(skip_dry_run: bool) -> None:
                 f"[bold yellow]Dry run complete. Created: {created_count}, Updated: {updated_count}.[/bold yellow]"
             )
             console.print("Rolling back changes. Use --skip-dry-run to apply.")
-            db_session.rollback()
+            await db_session.rollback()
         else:
             try:
-                db_session.commit()
+                await db_session.commit()
                 console.print(
                     f"[bold green]Successfully populated/updated plans. Created: {created_count}, Updated: {updated_count}.[/bold green]"
                 )
             except Exception as e:
-                db_session.rollback()
+                await db_session.rollback()
                 console.print(f"[bold red]Error during commit: {e}[/bold red]")
                 raise click.Abort() from e

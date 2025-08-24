@@ -28,23 +28,25 @@ logger = get_logger(__name__)
 async def create_app_configuration(
     context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
     body: AppConfigurationCreate,
-) -> AppConfiguration:
+) -> AppConfigurationPublic:
     """Create an app configuration for a project"""
 
     # TODO: validate security scheme
-    app = crud.apps.get_app(
+    app = await crud.apps.get_app(
         context.db_session,
         body.app_name,
         context.project.visibility_access == Visibility.PUBLIC,
         True,
+        context.project.id,
     )
     if not app:
         logger.error(f"App not found, app_name={body.app_name}")
         raise AppNotFound(f"app={body.app_name} not found")
 
-    if crud.app_configurations.app_configuration_exists(
+    app_config_exists = await crud.app_configurations.app_configuration_exists(
         context.db_session, context.project.id, body.app_name
-    ):
+    )
+    if app_config_exists:
         logger.error(f"App configuration already exists, app_name={body.app_name}")
         raise AppConfigurationAlreadyExists(
             f"app={body.app_name} already configured for project={context.project.id}"
@@ -58,14 +60,15 @@ async def create_app_configuration(
         raise AppSecuritySchemeNotSupported(
             f"app={body.app_name} does not support security_scheme={body.security_scheme}"
         )
-    app_configuration = crud.app_configurations.create_app_configuration(
+    app_configuration = await crud.app_configurations.create_app_configuration(
         context.db_session,
         context.project.id,
         body,
     )
-    context.db_session.commit()
 
-    return app_configuration
+    app_configuration_public = AppConfigurationPublic.model_validate(app_configuration)
+    await context.db_session.commit()
+    return app_configuration_public
 
 
 @router.get("", response_model=list[AppConfigurationPublic], response_model_exclude_none=True)
@@ -75,7 +78,7 @@ async def list_app_configurations(
 ) -> list[AppConfiguration]:
     """List all app configurations for a project, with optionally filters"""
 
-    return crud.app_configurations.get_app_configurations(
+    return await crud.app_configurations.get_app_configurations(
         context.db_session,
         context.project.id,
         query_params.app_names,
@@ -91,7 +94,7 @@ async def get_app_configuration(
 ) -> AppConfiguration:
     """Get an app configuration by app name"""
 
-    app_configuration = crud.app_configurations.get_app_configuration(
+    app_configuration = await crud.app_configurations.get_app_configuration(
         context.db_session, context.project.id, app_name
     )
     if not app_configuration:
@@ -113,7 +116,7 @@ async def delete_app_configuration(
     associated linked accounts, and then the app configuration record itself.
     """
 
-    app_configuration = crud.app_configurations.get_app_configuration(
+    app_configuration = await crud.app_configurations.get_app_configuration(
         context.db_session, context.project.id, app_name
     )
     if not app_configuration:
@@ -124,7 +127,7 @@ async def delete_app_configuration(
 
     # TODO: double check atomic operations like below in other api endpoints
     # 1. Delete all linked accounts for this app configuration
-    number_of_linked_accounts_deleted = crud.linked_accounts.delete_linked_accounts(
+    number_of_linked_accounts_deleted = await crud.linked_accounts.delete_linked_accounts(
         context.db_session, context.project.id, app_name
     )
     logger.warning(
@@ -132,14 +135,14 @@ async def delete_app_configuration(
         f"app_name={app_name}"
     )
     # 2. Delete the app configuration record
-    crud.app_configurations.delete_app_configuration(
+    await crud.app_configurations.delete_app_configuration(
         context.db_session, context.project.id, app_name
     )
 
     # 3. delete all MCP servers associated with this app configuration
-    crud.mcp_servers.delete_mcp_servers_by_app_config(db_session=context.db_session, app_config_id=app_configuration.id)
+    await crud.mcp_servers.delete_mcp_servers_by_app_config(db_session=context.db_session, app_config_id=app_configuration.id)
 
-    context.db_session.commit()
+    await context.db_session.commit()
 
 
 @router.patch(
@@ -149,13 +152,13 @@ async def update_app_configuration(
     context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
     app_name: str,
     body: AppConfigurationUpdate,
-) -> AppConfiguration:
+) -> AppConfigurationPublic:
     """
     Update an app configuration by app name.
     If a field is not included in the request body, it will not be changed.
     """
     # validations
-    app_configuration = crud.app_configurations.get_app_configuration(
+    app_configuration = await crud.app_configurations.get_app_configuration(
         context.db_session, context.project.id, app_name
     )
     if not app_configuration:
@@ -164,7 +167,8 @@ async def update_app_configuration(
             f"Configuration for app={app_name} not found, please configure the app first {config.DEV_PORTAL_URL}/apps/{app_name}"
         )
 
-    crud.app_configurations.update_app_configuration(context.db_session, app_configuration, body)
-    context.db_session.commit()
+    await crud.app_configurations.update_app_configuration(context.db_session, app_configuration, body)
 
-    return app_configuration
+    app_configuration_public = AppConfigurationPublic.model_validate(app_configuration)
+    await context.db_session.commit()
+    return app_configuration_public

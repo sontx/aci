@@ -66,10 +66,10 @@ def custom_generate_unique_id(route: APIRoute) -> str:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    log_appender.start()
+    await log_appender.start()
     yield
     # Shutdown
-    log_appender.stop()
+    await log_appender.stop()
 
 
 # TODO: move to config

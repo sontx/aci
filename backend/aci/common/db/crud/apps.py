@@ -5,7 +5,7 @@ CRUD operations for apps. (not including app_configurations)
 from uuid import UUID
 
 from sqlalchemy import select, update, or_, func, exists
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from aci.common.config import APP_ORG_PREFIX
 from aci.common.db.sql_models import App
@@ -19,8 +19,8 @@ from aci.common.utils import format_to_screaming_snake_case
 logger = get_logger(__name__)
 
 
-def create_app(
-        db_session: Session,
+async def create_app(
+        db_session: AsyncSession,
         app_upsert: AppUpsert,
 ) -> App:
     logger.debug(f"Creating app: {app_upsert}")
@@ -31,13 +31,13 @@ def create_app(
     )
 
     db_session.add(app)
-    db_session.flush()
-    db_session.refresh(app)
+    await db_session.flush()
+    await db_session.refresh(app)
     return app
 
 
-def update_app(
-        db_session: Session,
+async def update_app(
+        db_session: AsyncSession,
         app: App,
         app_upsert: AppUpsert,
 ) -> App:
@@ -49,13 +49,13 @@ def update_app(
     for field, value in new_app_data.items():
         setattr(app, field, value)
 
-    db_session.flush()
-    db_session.refresh(app)
+    await db_session.flush()
+    await db_session.refresh(app)
     return app
 
 
-def update_app_default_security_credentials(
-        db_session: Session,
+async def update_app_default_security_credentials(
+        db_session: AsyncSession,
         app: App,
         security_scheme: SecurityScheme,
         security_credentials: dict,
@@ -65,8 +65,8 @@ def update_app_default_security_credentials(
     app.default_security_credentials_by_scheme[security_scheme] = security_credentials
 
 
-def get_app_by_name(
-        db_session: Session,
+async def get_app_by_name(
+        db_session: AsyncSession,
         app_name: str,
         project_id: UUID | None = None,
 ) -> App | None:
@@ -74,12 +74,13 @@ def get_app_by_name(
     # Filter to show global apps (project_id is None) and user's org apps
     if project_id is not None:
         statement = statement.filter(or_(App.project_id.is_(None), App.project_id == project_id))
-    app: App | None = db_session.execute(statement).scalar_one_or_none()
+    result = await db_session.execute(statement)
+    app: App | None = result.scalar_one_or_none()
     return app
 
 
-def get_app(
-        db_session: Session,
+async def get_app(
+        db_session: AsyncSession,
         app_name: str,
         public_only: bool,
         active_only: bool,
@@ -96,7 +97,8 @@ def get_app(
     if project_id is not None:
         statement = statement.filter(or_(App.project_id.is_(None), App.project_id == project_id))
 
-    app: App | None = db_session.execute(statement).scalar_one_or_none()
+    result = await db_session.execute(statement)
+    app: App | None = result.scalar_one_or_none()
     return app
 
 
@@ -140,8 +142,8 @@ def _build_filtered_app_query(
     return statement
 
 
-def get_apps(
-        db_session: Session,
+async def get_apps(
+        db_session: AsyncSession,
         public_only: bool,
         active_only: bool,
         app_names: list[str] | None,
@@ -163,11 +165,12 @@ def get_apps(
     if limit is not None:
         statement = statement.limit(limit)
 
-    return list(db_session.execute(statement).scalars().all())
+    result = await db_session.execute(statement)
+    return list(result.scalars().all())
 
 
-def get_apps_by_names(
-        db_session: Session,
+async def get_apps_by_names(
+        db_session: AsyncSession,
         app_names: list[str],
 ) -> list[App]:
     """
@@ -178,11 +181,12 @@ def get_apps_by_names(
         return []
 
     statement = select(App).filter(App.name.in_(app_names))
-    return list(db_session.execute(statement).scalars().all())
+    result = await db_session.execute(statement)
+    return list(result.scalars().all())
 
 
-def count_apps(
-        db_session: Session,
+async def count_apps(
+        db_session: AsyncSession,
         public_only: bool,
         active_only: bool,
         app_names: list[str] | None,
@@ -198,11 +202,12 @@ def count_apps(
     # Replace the select with count
     statement = statement.with_only_columns(func.count(App.id))
 
-    return db_session.execute(statement).scalar() or 0
+    result = await db_session.execute(statement)
+    return result.scalar() or 0
 
 
-def get_all_categories(
-        db_session: Session,
+async def get_all_categories(
+        db_session: AsyncSession,
         public_only: bool,
         active_only: bool,
         project_id: UUID | None = None,
@@ -217,21 +222,22 @@ def get_all_categories(
         func.unnest(App.categories).label('category')
     ).distinct().order_by('category')
 
-    categories = db_session.execute(statement).scalars().all()
+    result = await db_session.execute(statement)
+    categories = result.scalars().all()
     return [cat for cat in categories if cat]  # Filter out None values
 
 
-def set_app_active_status(db_session: Session, app_name: str, active: bool) -> None:
+async def set_app_active_status(db_session: AsyncSession, app_name: str, active: bool) -> None:
     statement = update(App).filter_by(name=app_name).values(active=active)
-    db_session.execute(statement)
+    await db_session.execute(statement)
 
 
-def set_app_visibility(db_session: Session, app_name: str, visibility: Visibility) -> None:
+async def set_app_visibility(db_session: AsyncSession, app_name: str, visibility: Visibility) -> None:
     statement = update(App).filter_by(name=app_name).values(visibility=visibility)
-    db_session.execute(statement)
+    await db_session.execute(statement)
 
 
-def _generate_org_app_name(db_session: Session, user_display_name: str) -> str:
+async def _generate_org_app_name(db_session: AsyncSession, user_display_name: str) -> str:
     """Generate the actual app name for organization apps with prefix."""
     candidate_app_name = format_to_screaming_snake_case(user_display_name)
 
@@ -242,7 +248,8 @@ def _generate_org_app_name(db_session: Session, user_display_name: str) -> str:
             App.name == candidate_app_name,
         )
     )
-    exists_global_app = db_session.execute(statement).scalar_one_or_none()
+    result = await db_session.execute(statement)
+    exists_global_app = result.scalar_one_or_none()
     if exists_global_app:
         # Use a unique name by appending a suffix
         return f"{APP_ORG_PREFIX}{format_to_screaming_snake_case(user_display_name)}"
@@ -250,8 +257,8 @@ def _generate_org_app_name(db_session: Session, user_display_name: str) -> str:
     return candidate_app_name
 
 
-def create_user_app(
-        db_session: Session,
+async def create_user_app(
+        db_session: AsyncSession,
         app_upsert: AppUpsert,
         project_id: UUID,
 ) -> App:
@@ -261,7 +268,7 @@ def create_user_app(
     logger.debug(f"Creating user app: {app_upsert} for project_id: {project_id}")
 
     # Find the best candidate app name
-    actual_app_name = _generate_org_app_name(db_session, app_upsert.display_name)
+    actual_app_name = await _generate_org_app_name(db_session, app_upsert.display_name)
 
     # Prepare app data
     app_data = app_upsert.model_dump(mode="json", exclude_none=True)
@@ -271,13 +278,13 @@ def create_user_app(
     app = App(**app_data)
 
     db_session.add(app)
-    db_session.flush()
-    db_session.refresh(app)
+    await db_session.flush()
+    await db_session.refresh(app)
     return app
 
 
-def update_user_app(
-        db_session: Session,
+async def update_user_app(
+        db_session: AsyncSession,
         app_name: str,
         app_upsert: AppUpsert,
         project_id: UUID,
@@ -289,7 +296,7 @@ def update_user_app(
     logger.debug(f"Updating user app: {app_name} for project_id: {project_id}")
 
     # Get the app and verify it belongs to the org
-    app = get_user_app_by_name(db_session, app_name, project_id)
+    app = await get_user_app_by_name(db_session, app_name, project_id)
     if not app:
         raise ConflictError("App not found or does not belong to your organization")
 
@@ -304,13 +311,13 @@ def update_user_app(
     for field, value in new_app_data.items():
         setattr(app, field, value)
 
-    db_session.flush()
-    db_session.refresh(app)
+    await db_session.flush()
+    await db_session.refresh(app)
     return app
 
 
-def delete_user_app(
-        db_session: Session,
+async def delete_user_app(
+        db_session: AsyncSession,
         app_name: str,
         project_id: UUID,
 ) -> None:
@@ -320,7 +327,7 @@ def delete_user_app(
     logger.debug(f"Deleting user app: {app_name} for project_id: {project_id}")
 
     # Get the app and verify it belongs to the org
-    app = get_user_app_by_name(db_session, app_name, project_id)
+    app = await get_user_app_by_name(db_session, app_name, project_id)
     if not app:
         raise ConflictError("App not found or does not belong to your organization")
 
@@ -328,12 +335,12 @@ def delete_user_app(
     if app.project_id is None:
         raise ConflictError("Cannot delete global app")
 
-    db_session.delete(app)
-    db_session.flush()
+    await db_session.delete(app)
+    await db_session.flush()
 
 
-def get_user_app(
-        db_session: Session,
+async def get_user_app(
+        db_session: AsyncSession,
         app_name: str,
         project_id: UUID,
         active_only: bool = True,
@@ -346,11 +353,12 @@ def get_user_app(
     if active_only:
         statement = statement.filter(App.active)
 
-    return db_session.execute(statement).scalar_one_or_none()
+    result = await db_session.execute(statement)
+    return result.scalar_one_or_none()
 
 
-def get_user_apps(
-        db_session: Session,
+async def get_user_apps(
+        db_session: AsyncSession,
         project_id: UUID,
         active_only: bool = True,
         search: str | None = None,
@@ -389,11 +397,12 @@ def get_user_apps(
     if limit is not None:
         statement = statement.limit(limit)
 
-    return list(db_session.execute(statement).scalars().all())
+    result = await db_session.execute(statement)
+    return list(result.scalars().all())
 
 
-def count_user_apps(
-        db_session: Session,
+async def count_user_apps(
+        db_session: AsyncSession,
         project_id: UUID,
         active_only: bool = True,
         search: str | None = None,
@@ -422,7 +431,8 @@ def count_user_apps(
     if categories:
         statement = statement.filter(App.categories.overlap(categories))
 
-    return db_session.execute(statement).scalar() or 0
+    result = await db_session.execute(statement)
+    return result.scalar() or 0
 
 
 def to_app_details(app) -> AppDetails:
@@ -448,8 +458,8 @@ def to_app_details(app) -> AppDetails:
     )
 
 
-def get_user_app_by_name(
-        db_session: Session,
+async def get_user_app_by_name(
+        db_session: AsyncSession,
         app_name: str,
         project_id: UUID,
 ) -> App | None:
@@ -458,4 +468,5 @@ def get_user_app_by_name(
     This looks for the actual stored app name (with org prefix).
     """
     statement = select(App).filter_by(name=app_name, project_id=project_id)
-    return db_session.execute(statement).scalar_one_or_none()
+    result = await db_session.execute(statement)
+    return result.scalar_one_or_none()

@@ -5,7 +5,7 @@ CRUD operations for API keys.
 from uuid import UUID
 
 from sqlalchemy import select, func, delete
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from aci.common import encryption, utils
 from aci.common.db.sql_models import APIKey
@@ -16,8 +16,8 @@ from aci.common.schemas.api_key import APIKeyUpdate, APIKeyExtract
 logger = get_logger(__name__)
 
 
-def create_api_key(
-        db_session: Session,
+async def create_api_key(
+        db_session: AsyncSession,
         project_id: UUID,
         name: str,
 ) -> tuple[APIKey, str]:
@@ -38,31 +38,33 @@ def create_api_key(
     )
 
     db_session.add(api_key)
-    db_session.flush()
-    db_session.refresh(api_key)
+    await db_session.flush()
+    await db_session.refresh(api_key)
     return api_key, api_key_string
 
 
-def get_api_key_by_id(db_session: Session, api_key_id: UUID) -> APIKey | None:
+async def get_api_key_by_id(db_session: AsyncSession, api_key_id: UUID) -> APIKey | None:
     """
     Get an API key by its ID.
     """
-    return db_session.execute(
+    result = await db_session.execute(
         select(APIKey).filter_by(id=api_key_id)
-    ).scalar_one_or_none()
+    )
+    return result.scalar_one_or_none()
 
 
-def get_api_key_by_name(db_session: Session, project_id: UUID, name: str) -> APIKey | None:
+async def get_api_key_by_name(db_session: AsyncSession, project_id: UUID, name: str) -> APIKey | None:
     """
     Get an API key by its name within a project.
     """
-    return db_session.execute(
+    result = await db_session.execute(
         select(APIKey).filter_by(project_id=project_id, name=name)
-    ).scalar_one_or_none()
+    )
+    return result.scalar_one_or_none()
 
 
-def get_api_keys_by_project(
-        db_session: Session,
+async def get_api_keys_by_project(
+        db_session: AsyncSession,
         project_id: UUID,
         limit: int = 100,
         offset: int = 0,
@@ -70,28 +72,29 @@ def get_api_keys_by_project(
     """
     Get API keys for a project with pagination.
     """
-    api_keys = db_session.execute(
+    result = await db_session.execute(
         select(APIKey)
         .filter_by(project_id=project_id)
         .order_by(APIKey.created_at.desc())
         .limit(limit)
         .offset(offset)
-    ).scalars().all()
-
+    )
+    api_keys = result.scalars().all()
     return list(api_keys)
 
 
-def count_api_keys_by_project(db_session: Session, project_id: UUID) -> int:
+async def count_api_keys_by_project(db_session: AsyncSession, project_id: UUID) -> int:
     """
     Count total API keys for a project.
     """
-    return db_session.execute(
+    result = await db_session.execute(
         select(func.count(APIKey.id)).filter_by(project_id=project_id)
-    ).scalar() or 0
+    )
+    return result.scalar() or 0
 
 
-def update_api_key(
-        db_session: Session,
+async def update_api_key(
+        db_session: AsyncSession,
         api_key: APIKey,
         update: APIKeyUpdate,
 ) -> APIKey:
@@ -101,31 +104,31 @@ def update_api_key(
     if update.status is not None:
         api_key.status = update.status
 
-    db_session.flush()
-    db_session.refresh(api_key)
+    await db_session.flush()
+    await db_session.refresh(api_key)
     return api_key
 
 
-def delete_api_key_by_name(db_session: Session, project_id: UUID, name: str) -> None:
+async def delete_api_key_by_name(db_session: AsyncSession, project_id: UUID, name: str) -> None:
     statement = (
         delete(APIKey)
         .filter_by(project_id=project_id, name=name)
     )
-    db_session.execute(statement)
+    await db_session.execute(statement)
 
 
-def hard_delete_api_key(db_session: Session, api_key_id: UUID) -> None:
+async def hard_delete_api_key(db_session: AsyncSession, api_key_id: UUID) -> None:
     """
     Hard delete an API key from the database.
     """
-    api_key = get_api_key_by_id(db_session, api_key_id)
+    api_key = await get_api_key_by_id(db_session, api_key_id)
     if api_key:
-        db_session.delete(api_key)
-        db_session.flush()
+        await db_session.delete(api_key)
+        await db_session.flush()
 
 
-def extract_api_key(
-        db_session: Session,
+async def extract_api_key(
+        db_session: AsyncSession,
         api_key: str,
 ) -> APIKeyExtract | None:
     if not api_key:
@@ -138,20 +141,21 @@ def extract_api_key(
         return None
 
     key_hmac = encryption.hmac_sha256(api_key)
-    result = db_session.execute(
+    result = await db_session.execute(
         select(APIKey).filter_by(key_hmac=key_hmac, status=APIKeyStatus.ACTIVE)
-    ).scalar_one_or_none()
+    )
+    api_key_record = result.scalar_one_or_none()
 
-    if not result:
+    if not api_key_record:
         return None
 
-    project = result.project
+    project = api_key_record.project
     if not project:
-        logger.error(f"Project not found for API key with ID {result.id}")
+        logger.error(f"Project not found for API key with ID {api_key_record.id}")
         return None
 
     return APIKeyExtract(
-        id=result.id,
-        name=result.name,
+        id=api_key_record.id,
+        name=api_key_record.name,
         project=project,
     )

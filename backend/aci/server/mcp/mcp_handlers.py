@@ -13,13 +13,11 @@ from mcp import types
 from mcp.server.lowlevel import Server
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from mcp.types import Tool as MCPTool
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.types import Receive, Scope, Send
 
 from aci.common import processor
 from aci.common.db import crud
-from aci.common.db.crud.apps import get_app
-from aci.common.db.crud.functions import get_functions_by_app_id
 from aci.common.db.sql_models import Function, MCPServer
 from aci.common.enums import ExecutionStatus, MCPAuthType
 from aci.common.exceptions import FunctionNotFound, AppConfigurationNotFound, AppConfigurationDisabled, \
@@ -42,7 +40,7 @@ router = APIRouter()
 class MCPRequestContext:
     def __init__(
             self,
-            db_session: Session,
+            db_session: AsyncSession,
             linked_account_owner_id: str | None = None,
             execution_id: UUID | None = None,
             api_key_name: str | None = None,
@@ -59,15 +57,18 @@ mcp_request_ctx_var = contextvars.ContextVar[MCPRequestContext | None]("mcp_requ
 class MCPAppServer:
     """MCP Server for a specific app using StreamableHTTPSessionManager"""
 
-    def __init__(self, mcp_server: MCPServer, db_session: Session, project_id: UUID | None):
-        self.mcp_server_id = mcp_server.id
+    def __init__(self, project_id: UUID | None):
+        self.mcp_server_id: UUID | None = None
+        self.app_config_id: UUID | None = None
+        self.app_name: str | None = None
+        self.app_id: UUID | None = None
+        self.server: Server | None = None
+        self.tools: List[types.Tool] = []
         self.project_id = project_id
         self.session_manager = None
         self._session_manager_started = False
-        self._initialize(db_session, mcp_server)
-        self._setup_handlers()
 
-    def _initialize(self, db_session: Session, mcp_server: MCPServer):
+    async def initialize(self, db_session: AsyncSession, mcp_server: MCPServer):
         def format_function_definition(function: Function) -> MCPTool:
             """Format function definition for MCP"""
 
@@ -78,22 +79,18 @@ class MCPAppServer:
                 outputSchema=processor.filter_visible_properties(function.response) if function.response else None,
             )
 
-        app = get_app(db_session, mcp_server.app_name, public_only=False, active_only=False)
-        if not app:
-            raise HTTPException(
-                status_code=404,
-                detail=f"App with name {mcp_server.app_name} not found"
-            )
-
-        self.app_name = app.name
+        self.mcp_server_id = mcp_server.id
         self.app_config_id = mcp_server.app_config_id
-        if not self.project_id:
-            self.project_id = mcp_server.app_configuration.project_id
+
+        app_configuration = await mcp_server.awaitable_attrs.app_configuration
+        self.project_id = app_configuration.project_id
+        self.app_name = app_configuration.app.name
+        self.app_id = app_configuration.app.id
 
         allowed_function_names = mcp_server.allowed_tools
         allowed_functions: list[Function] = []
         if allowed_function_names:
-            all_functions = get_functions_by_app_id(db_session, app.id)
+            all_functions = await crud.functions.get_functions_by_app_id(db_session, self.app_id)
             allowed_functions = [
                 function for function in all_functions
                 if function.name in allowed_function_names and function.active
@@ -116,6 +113,7 @@ class MCPAppServer:
         self.tools = tools
 
         self.server = Server(mcp_server.name)
+        self._setup_handlers()
 
     def _setup_handlers(self):
         """Setup MCP server handlers"""
@@ -154,7 +152,7 @@ class MCPAppServer:
             execution_time = int((end - start) * 1000)
             execution_id = context.execution_id
 
-            log_appender.enqueue(
+            await log_appender.enqueue(
                 function_name=name,
                 app_name=self.app_name,
                 project_id=self.project_id,
@@ -223,7 +221,7 @@ class MCPAppServer:
 
 
 async def execute_function(
-        db_session: Session,
+        db_session: AsyncSession,
         function_name: str,
         function_input: dict,
         app_config_id: UUID,
@@ -232,7 +230,7 @@ async def execute_function(
         project_id: str | None = None,
 ) -> tuple[Function, FunctionExecutionResult]:
     # Get the function
-    function = crud.functions.get_function(
+    function = await crud.functions.get_function(
         db_session,
         function_name,
         False,
@@ -246,7 +244,7 @@ async def execute_function(
         raise FunctionNotFound(f"function={function_name} not found")
 
     # Check if the App (that this function belongs to) is configured
-    app_configuration = crud.app_configurations.get_app_configuration_by_id(db_session, app_config_id)
+    app_configuration = await crud.app_configurations.get_app_configuration_by_id(db_session, app_config_id)
     if not app_configuration:
         logger.error(
             f"Failed to execute function, app configuration not found, "
@@ -266,7 +264,7 @@ async def execute_function(
         )
 
     # Check if the linked account status (configured, enabled, etc.)
-    linked_account = crud.linked_accounts.get_linked_account(
+    linked_account = await crud.linked_accounts.get_linked_account(
         db_session,
         app_configuration.project_id,
         function.app.name,
@@ -296,7 +294,7 @@ async def execute_function(
         app_configuration.app, app_configuration, linked_account
     )
 
-    scm.update_security_credentials(
+    await scm.update_security_credentials(
         db_session, function.app, linked_account, security_credentials_response
     )
 
@@ -306,7 +304,7 @@ async def execute_function(
         f"linked_account_id={linked_account.id}, is_updated={security_credentials_response.is_updated}, "
         f"is_app_default_credentials={security_credentials_response.is_app_default_credentials}"
     )
-    db_session.commit()
+    await db_session.commit()
 
     function_executor = get_executor(function.protocol, linked_account)
     logger.info(
@@ -323,17 +321,17 @@ async def execute_function(
     )
 
     last_used_at: datetime = datetime.now(UTC)
-    crud.linked_accounts.update_linked_account_last_used_at(
+    await crud.linked_accounts.update_linked_account_last_used_at(
         db_session,
         last_used_at,
         linked_account,
     )
-    crud.mcp_servers.update_mcp_server_last_used_at(
+    await crud.mcp_servers.update_mcp_server_last_used_at(
         db_session,
         mcp_server_id,
         last_used_at,
     )
-    db_session.commit()
+    await db_session.commit()
 
     if not execution_result.success:
         logger.error(
@@ -428,7 +426,7 @@ class MCPServerCache:
                     self.mcp_servers_cache[link] = cache_item
                 return False
 
-    async def get(self, link: str, db_session: Session, project_id: UUID | None) -> MCPAppServer:
+    async def get(self, link: str, db_session: AsyncSession, project_id: UUID | None) -> MCPAppServer:
         """Get or create MCP server instance for the given app"""
         current_time = datetime.now(UTC)
 
@@ -458,7 +456,7 @@ class MCPServerCache:
 
             # Create new instance
             logger.info(f"Creating new MCP server instance for link: {link}")
-            mcp_server = crud.mcp_servers.get_mcp_server_by_link(db_session, link)
+            mcp_server = await crud.mcp_servers.get_mcp_server_by_link(db_session, link)
             if not mcp_server:
                 raise HTTPException(
                     status_code=404,
@@ -467,7 +465,8 @@ class MCPServerCache:
 
             self.validate_auth_type(mcp_server.auth_type)
 
-            mcp_app_server = MCPAppServer(mcp_server, db_session, project_id)
+            mcp_app_server = MCPAppServer(project_id)
+            await mcp_app_server.initialize(db_session, mcp_server)
             cache_item = MCPCacheItem(
                 server=mcp_app_server,
                 last_used_at=current_time,

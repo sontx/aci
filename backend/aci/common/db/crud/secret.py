@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from aci.common.db.sql_models import LinkedAccount, Project, Secret
 from aci.common.logging_setup import get_logger
@@ -10,8 +10,8 @@ from aci.common.schemas.secret import SecretCreate, SecretUpdate
 logger = get_logger(__name__)
 
 
-def create_secret(
-    db_session: Session,
+async def create_secret(
+    db_session: AsyncSession,
     linked_account_id: UUID,
     secret_create: SecretCreate,
 ) -> Secret:
@@ -24,32 +24,34 @@ def create_secret(
         value=secret_create.value,
     )
     db_session.add(secret)
-    db_session.flush()
-    db_session.refresh(secret)
+    await db_session.flush()
+    await db_session.refresh(secret)
 
     return secret
 
 
-def get_secret(db_session: Session, linked_account_id: UUID, key: str) -> Secret | None:
+async def get_secret(db_session: AsyncSession, linked_account_id: UUID, key: str) -> Secret | None:
     """
     Get a secret by linked_account_id and key.
     """
     statement = select(Secret).filter_by(linked_account_id=linked_account_id, key=key)
-    return db_session.execute(statement).scalar_one_or_none()
+    result = await db_session.execute(statement)
+    return result.scalar_one_or_none()
 
 
-def list_secrets(db_session: Session, linked_account_id: UUID) -> list[Secret]:
+async def list_secrets(db_session: AsyncSession, linked_account_id: UUID) -> list[Secret]:
     """
     List all secrets for a linked account.
     """
     statement = select(Secret).filter_by(linked_account_id=linked_account_id)
-    secrets = db_session.execute(statement).scalars().all()
+    result = await db_session.execute(statement)
+    secrets = result.scalars().all()
 
     return list(secrets)
 
 
-def update_secret(
-    db_session: Session,
+async def update_secret(
+    db_session: AsyncSession,
     secret: Secret,
     update: SecretUpdate,
 ) -> Secret:
@@ -57,20 +59,20 @@ def update_secret(
     Update a secret's value.
     """
     secret.value = update.value
-    db_session.flush()
-    db_session.refresh(secret)
+    await db_session.flush()
+    await db_session.refresh(secret)
     return secret
 
 
-def delete_secret(db_session: Session, secret: Secret) -> None:
+async def delete_secret(db_session: AsyncSession, secret: Secret) -> None:
     """
     Delete a secret.
     """
-    db_session.delete(secret)
-    db_session.flush()
+    await db_session.delete(secret)
+    await db_session.flush()
 
 
-def get_total_number_of_agent_secrets_for_org(db_session: Session, org_id: UUID) -> int:
+async def get_total_number_of_agent_secrets_for_org(db_session: AsyncSession, org_id: UUID) -> int:
     """
     Get the total number of agent secrets for an organization across all its projects.
     Uses JOINs for better performance compared to nested subqueries.
@@ -81,4 +83,5 @@ def get_total_number_of_agent_secrets_for_org(db_session: Session, org_id: UUID)
         .join(Project, LinkedAccount.project_id == Project.id)
         .where(Project.org_id == org_id)
     )
-    return db_session.execute(statement).scalar_one()
+    result = await db_session.execute(statement)
+    return result.scalar_one()

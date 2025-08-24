@@ -5,7 +5,6 @@ import click
 from rich.console import Console
 from rich.progress import Progress
 from sqlalchemy import text
-from sqlalchemy.orm import Session
 
 from aci.common import encryption, utils
 from aci.cli import config

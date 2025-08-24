@@ -2,7 +2,7 @@ import logging
 from uuid import UUID
 
 from propelauth_fastapi import FastAPIAuth, User, init_auth
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from aci.common.db import crud
 from aci.common.enums import OrganizationRole
@@ -26,10 +26,10 @@ def validate_user_access_to_org(user: User, org_id: UUID) -> None:
     get_propelauth().require_org_member(user, str(org_id))
 
 
-def validate_user_access_to_project(db_session: Session, user: User, project_id: UUID) -> None:
+async def validate_user_access_to_project(db_session: AsyncSession, user: User, project_id: UUID) -> None:
     # TODO: refactor to use PropelAuth built-in methods
     # TODO: we can introduce project level ACLs later
-    project = crud.projects.get_project(db_session, project_id)
+    project = await crud.projects.get_project(db_session, project_id)
     if not project:
         raise ProjectNotFound(f"project={project_id} not found")
 

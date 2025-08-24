@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from aci.common.db.sql_models import App, AppConfiguration
 from aci.common.logging_setup import get_logger
@@ -13,17 +13,18 @@ from aci.common.schemas.app_configurations import (
 logger = get_logger(__name__)
 
 
-def create_app_configuration(
-    db_session: Session,
+async def create_app_configuration(
+    db_session: AsyncSession,
     project_id: UUID,
     app_configuration_create: AppConfigurationCreate,
 ) -> AppConfiguration:
     """
     Create a new app configuration record
     """
-    app_id = db_session.execute(
+    result = await db_session.execute(
         select(App.id).filter_by(name=app_configuration_create.app_name)
-    ).scalar_one()
+    )
+    app_id = result.scalar_one()
     app_configuration = AppConfiguration(
         project_id=project_id,
         app_id=app_id,
@@ -36,14 +37,14 @@ def create_app_configuration(
         enabled_functions=app_configuration_create.enabled_functions,
     )
     db_session.add(app_configuration)
-    db_session.flush()
-    db_session.refresh(app_configuration)
+    await db_session.flush()
+    await db_session.refresh(app_configuration)
 
     return app_configuration
 
 
-def update_app_configuration(
-    db_session: Session,
+async def update_app_configuration(
+    db_session: AsyncSession,
     app_configuration: AppConfiguration,
     update: AppConfigurationUpdate,
 ) -> AppConfiguration:
@@ -59,25 +60,26 @@ def update_app_configuration(
     if update.enabled_functions is not None:
         app_configuration.enabled_functions = update.enabled_functions
 
-    db_session.flush()
-    db_session.refresh(app_configuration)
+    await db_session.flush()
+    await db_session.refresh(app_configuration)
 
     return app_configuration
 
 
-def delete_app_configuration(db_session: Session, project_id: UUID, app_name: str) -> None:
+async def delete_app_configuration(db_session: AsyncSession, project_id: UUID, app_name: str) -> None:
     statement = (
         select(AppConfiguration)
         .join(App, AppConfiguration.app_id == App.id)
         .filter(AppConfiguration.project_id == project_id, App.name == app_name)
     )
-    app_to_delete = db_session.execute(statement).scalar_one()
-    db_session.delete(app_to_delete)
-    db_session.flush()
+    result = await db_session.execute(statement)
+    app_to_delete = result.scalar_one()
+    await db_session.delete(app_to_delete)
+    await db_session.flush()
 
 
-def get_app_configurations(
-    db_session: Session,
+async def get_app_configurations(
+    db_session: AsyncSession,
     project_id: UUID,
     app_names: list[str] | None,
     limit: int,
@@ -90,36 +92,40 @@ def get_app_configurations(
             App.name.in_(app_names)
         )
     statement = statement.offset(offset).limit(limit)
-    app_configurations = list(db_session.execute(statement).scalars().all())
+    result = await db_session.execute(statement)
+    app_configurations = list(result.scalars().all())
     return app_configurations
 
 
-def get_app_configuration(
-    db_session: Session, project_id: UUID, app_name: str
+async def get_app_configuration(
+    db_session: AsyncSession, project_id: UUID, app_name: str
 ) -> AppConfiguration | None:
     """Get an app configuration by project id and app name"""
-    app_configuration: AppConfiguration | None = db_session.execute(
+    result = await db_session.execute(
         select(AppConfiguration)
         .join(App, AppConfiguration.app_id == App.id)
         .filter(AppConfiguration.project_id == project_id, App.name == app_name)
-    ).scalar_one_or_none()
+    )
+    app_configuration: AppConfiguration | None = result.scalar_one_or_none()
     return app_configuration
 
 
-def get_app_configurations_by_app_id(db_session: Session, app_id: UUID) -> list[AppConfiguration]:
+async def get_app_configurations_by_app_id(db_session: AsyncSession, app_id: UUID) -> list[AppConfiguration]:
     statement = select(AppConfiguration).filter(AppConfiguration.app_id == app_id)
-    return list(db_session.execute(statement).scalars().all())
+    result = await db_session.execute(statement)
+    return list(result.scalars().all())
 
-def get_app_configuration_by_id(
-    db_session: Session, app_configuration_id: UUID
+async def get_app_configuration_by_id(
+    db_session: AsyncSession, app_configuration_id: UUID
 ) -> AppConfiguration | None:
     """Get an app configuration by its ID"""
-    return db_session.execute(
+    result = await db_session.execute(
         select(AppConfiguration).filter(AppConfiguration.id == app_configuration_id)
-    ).scalar_one_or_none()
+    )
+    return result.scalar_one_or_none()
 
 
-def app_configuration_exists(db_session: Session, project_id: UUID, app_name: str) -> bool:
+async def app_configuration_exists(db_session: AsyncSession, project_id: UUID, app_name: str) -> bool:
     stmt = (
         select(AppConfiguration)
         .join(App, AppConfiguration.app_id == App.id)
@@ -128,4 +134,5 @@ def app_configuration_exists(db_session: Session, project_id: UUID, app_name: st
             App.name == app_name,
         )
     )
-    return db_session.execute(stmt).scalar_one_or_none() is not None
+    result = await db_session.execute(stmt)
+    return result.scalar_one_or_none() is not None

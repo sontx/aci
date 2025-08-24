@@ -3,7 +3,7 @@ from typing import Optional
 from uuid import UUID
 
 from sqlalchemy import select, and_, Select, func
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from aci.common.db.sql_models import ExecutionLog, ExecutionDetail
 from aci.common.logging_setup import get_logger
@@ -11,8 +11,8 @@ from aci.common.logging_setup import get_logger
 logger = get_logger(__name__)
 
 
-def get_execution_logs(
-        db_session: Session,
+async def get_execution_logs(
+        db_session: AsyncSession,
         project_id: UUID,
         start_time: Optional[datetime] = None,
         end_time: Optional[datetime] = None,
@@ -45,11 +45,12 @@ def get_execution_logs(
     # Apply pagination
     statement = statement.offset(offset).limit(limit)
 
-    return list(db_session.execute(statement).scalars().all())
+    result = await db_session.execute(statement)
+    return list(result.scalars().all())
 
 
-def count_execution_logs(
-        db_session: Session,
+async def count_execution_logs(
+        db_session: AsyncSession,
         project_id: UUID,
         start_time: Optional[datetime] = None,
         end_time: Optional[datetime] = None,
@@ -74,7 +75,8 @@ def count_execution_logs(
         api_key_name=api_key_name,
     )
 
-    return db_session.execute(statement).scalar() or 0
+    result = await db_session.execute(statement)
+    return result.scalar() or 0
 
 
 def _build_execution_log_query(
@@ -115,8 +117,8 @@ def _build_execution_log_query(
     return statement
 
 
-def get_execution_log_by_id(
-        db_session: Session,
+async def get_execution_log_by_id(
+        db_session: AsyncSession,
         log_id: UUID,
         project_id: UUID,
 ) -> ExecutionLog | None:
@@ -132,11 +134,12 @@ def get_execution_log_by_id(
         )
     )
 
-    return db_session.execute(statement).scalar_one_or_none()
+    result = await db_session.execute(statement)
+    return result.scalar_one_or_none()
 
 
-def get_execution_detail_by_id(
-        db_session: Session,
+async def get_execution_detail_by_id(
+        db_session: AsyncSession,
         log_id: UUID,
 ) -> ExecutionDetail | None:
     """
@@ -146,11 +149,12 @@ def get_execution_detail_by_id(
 
     statement = select(ExecutionDetail).filter(ExecutionDetail.id == log_id)
 
-    return db_session.execute(statement).scalar_one_or_none()
+    result = await db_session.execute(statement)
+    return result.scalar_one_or_none()
 
 
-def get_execution_logs_statistics(
-        db_session: Session,
+async def get_execution_logs_statistics(
+        db_session: AsyncSession,
         project_id: UUID,
         start_time: Optional[datetime] = None,
         end_time: Optional[datetime] = None,
@@ -207,10 +211,11 @@ def get_execution_logs_statistics(
         query = query.filter(ExecutionLog.linked_account_owner_id == linked_account_owner_id)
 
     # Execute the optimized query
-    result = db_session.execute(query).one()
+    result = await db_session.execute(query)
+    row = result.one()
 
     # Handle case where no records are found
-    if result.total_count == 0:
+    if row.total_count == 0:
         return ExecutionLogsStatistics(
             total_count=0,
             success_count=0,
@@ -221,10 +226,10 @@ def get_execution_logs_statistics(
         )
 
     return ExecutionLogsStatistics(
-        total_count=result.total_count,
-        success_count=result.success_count or 0,
-        failure_count=result.failure_count or 0,
-        average_execution_time=float(result.avg_execution_time or 0),
-        min_execution_time=float(result.min_execution_time or 0),
-        max_execution_time=float(result.max_execution_time or 0)
+        total_count=row.total_count,
+        success_count=row.success_count or 0,
+        failure_count=row.failure_count or 0,
+        average_execution_time=float(row.avg_execution_time or 0),
+        min_execution_time=float(row.min_execution_time or 0),
+        max_execution_time=float(row.max_execution_time or 0)
     )

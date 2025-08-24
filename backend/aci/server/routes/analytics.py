@@ -15,8 +15,8 @@ router = APIRouter()
 logger = get_logger(__name__)
 
 
-def _get_project_api_key_ids_sql_list(context: deps.RequestContext) -> str | None:
-    project_api_key_ids = crud.projects.get_all_api_key_ids_for_project(
+async def _get_project_api_key_ids_sql_list(context: deps.RequestContext) -> str | None:
+    project_api_key_ids = await crud.projects.get_all_api_key_ids_for_project(
         context.db_session, context.project.id
     )
 
@@ -30,7 +30,7 @@ def _get_project_api_key_ids_sql_list(context: deps.RequestContext) -> str | Non
 async def get_app_usage_distribution(
         context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
 ) -> list[DistributionDatapoint]:
-    api_key_ids_sql_list = _get_project_api_key_ids_sql_list(context)
+    api_key_ids_sql_list = await _get_project_api_key_ids_sql_list(context)
 
     if not api_key_ids_sql_list:
         return []
@@ -59,7 +59,7 @@ ORDER BY value DESC;
 async def get_function_usage_distribution(
         context: Annotated[deps.RequestContext, Depends(deps.get_request_context)],
 ) -> list[DistributionDatapoint]:
-    api_key_ids_sql_list = _get_project_api_key_ids_sql_list(context)
+    api_key_ids_sql_list = await _get_project_api_key_ids_sql_list(context)
 
     if not api_key_ids_sql_list:
         return []
@@ -102,7 +102,8 @@ async def get_app_usage_timeseries(
                  ORDER BY date DESC
                  """)
 
-    results = context.db_session.execute(query, {"project_id": str(context.project.id)}).fetchall()
+    result = await context.db_session.execute(query, {"project_id": str(context.project.id)})
+    results = result.fetchall()
 
     # Transform the data format similar to app usage timeseries
     date_grouped = {}
@@ -138,7 +139,8 @@ async def get_function_usage_timeseries(
                  ORDER BY date DESC
                  """)
 
-    results = context.db_session.execute(query, {"project_id": str(context.project.id)}).fetchall()
+    result = await context.db_session.execute(query, {"project_id": str(context.project.id)})
+    results = result.fetchall()
 
     # Transform the data format similar to app usage timeseries
     date_grouped = {}

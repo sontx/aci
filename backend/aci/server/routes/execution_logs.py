@@ -5,12 +5,10 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 
 from aci.common.db import crud
-from aci.common.exceptions import ExecutionLogNotFound
 from aci.common.logging_setup import get_logger
 from aci.common.schemas.common import Paged
 from aci.common.schemas.execution_log import (
     ExecutionLogResponse,
-    ExecutionDetailResponse,
     ExecutionLogWithDetailResponse, ExecutionLogsStatistics,
 )
 from aci.server.dependencies import get_request_context, RequestContext
@@ -73,7 +71,7 @@ async def get_execution_logs(
     )
 
     # Get the logs
-    execution_logs = crud.execution_logs.get_execution_logs(
+    execution_logs = await crud.execution_logs.get_execution_logs(
         db_session=context.db_session,
         project_id=context.project.id,
         start_time=start_time,
@@ -88,7 +86,7 @@ async def get_execution_logs(
     )
 
     # Get total count for pagination
-    total_count = crud.execution_logs.count_execution_logs(
+    total_count = await crud.execution_logs.count_execution_logs(
         db_session=context.db_session,
         project_id=context.project.id,
         start_time=start_time,
@@ -159,7 +157,7 @@ async def get_execution_logs_statistics(
     )
 
     # Get the statistics
-    stats = crud.execution_logs.get_execution_logs_statistics(
+    stats = await crud.execution_logs.get_execution_logs_statistics(
         db_session=context.db_session,
         project_id=context.project.id,
         start_time=start_time,
@@ -191,7 +189,7 @@ async def get_execution_log_detail(
     logger.debug(f"Getting execution log detail for log_id={log_id}, project_id={context.project.id}")
 
     # Get the execution log
-    execution_log = crud.execution_logs.get_execution_log_by_id(
+    execution_log = await crud.execution_logs.get_execution_log_by_id(
         db_session=context.db_session,
         log_id=log_id,
         project_id=context.project.id,
@@ -205,7 +203,7 @@ async def get_execution_log_detail(
         )
 
     # Get the execution detail
-    execution_detail = crud.execution_logs.get_execution_detail_by_id(
+    execution_detail = await crud.execution_logs.get_execution_detail_by_id(
         db_session=context.db_session,
         log_id=log_id,
     )

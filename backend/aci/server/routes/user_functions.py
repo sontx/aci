@@ -6,7 +6,7 @@ from aci.common.db import crud
 from aci.common.enums import FunctionDefinitionFormat
 from aci.common.exceptions import ConflictError, FunctionNotFound
 from aci.common.logging_setup import get_logger
-from aci.common.schemas.function import BasicFunctionDefinition, FunctionDetails, FunctionUpsert, FunctionUpdate
+from aci.common.schemas.function import BasicFunctionDefinition, FunctionDetails, FunctionUpdate
 from aci.server.dependencies import get_request_context, RequestContext
 from aci.server.utils import format_function_definition
 
@@ -21,7 +21,7 @@ async def get_user_function_tags(
     """
     Get all tags used in user functions for the current project functions and global functions.
     """
-    tags = crud.functions.get_user_function_tags(context.db_session, context.project.id)
+    tags = await crud.functions.get_user_function_tags(context.db_session, context.project.id)
     return tags
 
 
@@ -38,7 +38,7 @@ async def get_user_function(
     """
     Get a specific user function definition by function name.
     """
-    function = crud.functions.get_user_function_by_name(
+    function = await crud.functions.get_user_function_by_name(
         context.db_session,
         function_name,
         context.project.id,
@@ -63,12 +63,12 @@ async def delete_user_function(
     Delete a user function by function name.
     """
     try:
-        crud.functions.delete_user_function(
+        await crud.functions.delete_user_function(
             context.db_session,
             function_name,
             context.project.id,
         )
-        context.db_session.commit()
+        await context.db_session.commit()
         logger.info(f"Deleted user function: {function_name} for org_id: {context.project.id}")
     except ConflictError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
@@ -84,13 +84,13 @@ async def update_user_function(
     Update a user function by function name.
     """
     try:
-        crud.functions.update_user_function(
+        await crud.functions.update_user_function(
             context.db_session,
             function_name,
             function_update,
             context.project.id,
         )
-        context.db_session.commit()
+        await context.db_session.commit()
         logger.info(f"Updated user function: {function_name} for project id: {context.project.id}")
     except FunctionNotFound as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))

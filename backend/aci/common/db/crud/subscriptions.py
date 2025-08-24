@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from sqlalchemy import select, update
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from aci.common.db.sql_models import Subscription
 from aci.common.logging_setup import get_logger
@@ -11,7 +11,7 @@ logger = get_logger(__name__)
 
 
 # TODO: no need to lock for most of the reads
-def get_subscription_by_org_id(db_session: Session, org_id: UUID) -> Subscription | None:
+async def get_subscription_by_org_id(db_session: AsyncSession, org_id: UUID) -> Subscription | None:
     """
     Get a subscription by organization ID.
     """
@@ -20,11 +20,12 @@ def get_subscription_by_org_id(db_session: Session, org_id: UUID) -> Subscriptio
         .filter_by(org_id=org_id)
         .with_for_update()  # lock the row for the duration of the transaction
     )
-    return db_session.execute(statement).scalar_one_or_none()
+    result = await db_session.execute(statement)
+    return result.scalar_one_or_none()
 
 
-def get_subscription_by_stripe_id(
-    db_session: Session, stripe_subscription_id: str
+async def get_subscription_by_stripe_id(
+    db_session: AsyncSession, stripe_subscription_id: str
 ) -> Subscription | None:
     """
     Get a subscription by Stripe subscription ID.
@@ -34,11 +35,12 @@ def get_subscription_by_stripe_id(
         .filter_by(stripe_subscription_id=stripe_subscription_id)
         .with_for_update()  # lock the row for the duration of the transaction
     )
-    return db_session.execute(statement).scalar_one_or_none()
+    result = await db_session.execute(statement)
+    return result.scalar_one_or_none()
 
 
-def update_subscription_by_stripe_id(
-    db_session: Session, stripe_subscription_id: str, subscription_update: SubscriptionUpdate
+async def update_subscription_by_stripe_id(
+    db_session: AsyncSession, stripe_subscription_id: str, subscription_update: SubscriptionUpdate
 ) -> Subscription | None:
     """
     Update subscription status based on Stripe subscription ID.
@@ -49,7 +51,7 @@ def update_subscription_by_stripe_id(
             f"No fields to update for subscription, stripe_subscription_id={stripe_subscription_id}"
         )
         # Need to fetch the subscription to return it
-        return get_subscription_by_stripe_id(db_session, stripe_subscription_id)
+        return await get_subscription_by_stripe_id(db_session, stripe_subscription_id)
 
     statement = (
         update(Subscription)
@@ -57,9 +59,9 @@ def update_subscription_by_stripe_id(
         .values(**update_data)
         .returning(Subscription)  # Return the updated object
     )
-    result = db_session.execute(statement)
+    result = await db_session.execute(statement)
     updated_subscription = result.scalar_one_or_none()
-    db_session.flush()  # Ensure changes are persisted before potential refresh
+    await db_session.flush()  # Ensure changes are persisted before potential refresh
 
     if updated_subscription:
         # No need to refresh as returning() fetches the updated state
@@ -72,11 +74,11 @@ def update_subscription_by_stripe_id(
     return updated_subscription
 
 
-def delete_subscription_by_stripe_id(db_session: Session, stripe_subscription_id: str) -> None:
+async def delete_subscription_by_stripe_id(db_session: AsyncSession, stripe_subscription_id: str) -> None:
     """
     Mark a subscription as deleted by Stripe subscription ID. Returns True if marked, False otherwise.
     """
-    subscription = get_subscription_by_stripe_id(db_session, stripe_subscription_id)
+    subscription = await get_subscription_by_stripe_id(db_session, stripe_subscription_id)
     if not subscription:
         logger.warning(
             f"Subscription not found during delete attempt, "
@@ -84,6 +86,6 @@ def delete_subscription_by_stripe_id(db_session: Session, stripe_subscription_id
         )
         return
 
-    db_session.delete(subscription)
-    db_session.flush()
+    await db_session.delete(subscription)
+    await db_session.flush()
     logger.info(f"Deleted subscription, stripe_subscription_id={stripe_subscription_id}")

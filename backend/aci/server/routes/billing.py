@@ -6,7 +6,7 @@ import stripe
 from fastapi import APIRouter, Body, Depends, Header, Request, status
 from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from aci.common.db import crud
 from aci.common.db.sql_models import Subscription
@@ -42,7 +42,7 @@ async def get_subscription(
 ) -> SubscriptionPublic:
     acl.require_org_member(context.user, context.project.org_id)
 
-    active_subscription = crud.subscriptions.get_subscription_by_org_id(context.db_session, context.project.org_id)
+    active_subscription = await crud.subscriptions.get_subscription_by_org_id(context.db_session, context.project.org_id)
     if not active_subscription:
         logger.info(
             "no active subscription found, the org is on the free plan",
@@ -53,7 +53,7 @@ async def get_subscription(
             status=StripeSubscriptionStatus.ACTIVE,
         )
 
-    plan = crud.plans.get_by_id(context.db_session, active_subscription.plan_id)
+    plan = await crud.plans.get_by_id(context.db_session, active_subscription.plan_id)
     if not plan:
         logger.error(
             "plan not found",
@@ -72,17 +72,17 @@ async def get_quota_usage(
 ) -> QuotaUsageResponse:
     acl.require_org_member(context.user, context.project.org_id)
 
-    active_plan = billing.get_active_plan_by_org_id(context.db_session, context.project.org_id)
+    active_plan = await billing.get_active_plan_by_org_id(context.db_session, context.project.org_id)
     logger.info(f"Getting quota usage, org_id={context.project.org_id}, plan={active_plan.name}")
 
-    projects_used = len(crud.projects.get_projects_by_org(context.db_session, context.project.org_id))
-    agent_credentials_used = crud.secret.get_total_number_of_agent_secrets_for_org(
+    projects_used = len(await crud.projects.get_projects_by_org(context.db_session, context.project.org_id))
+    agent_credentials_used = await crud.secret.get_total_number_of_agent_secrets_for_org(
         context.db_session, context.project.org_id
     )
-    linked_accounts_used = crud.linked_accounts.get_total_number_of_unique_linked_account_owner_ids(
+    linked_accounts_used = await crud.linked_accounts.get_total_number_of_unique_linked_account_owner_ids(
         context.db_session, context.project.org_id
     )
-    total_monthly_api_calls_used_of_org = crud.projects.get_total_monthly_quota_usage_for_org(
+    total_monthly_api_calls_used_of_org = await crud.projects.get_total_monthly_quota_usage_for_org(
         context.db_session, context.project.org_id
     )
 
@@ -102,7 +102,7 @@ async def create_checkout_session(
 ) -> str:
     acl.require_org_member_with_minimum_role(context.user, context.project.org_id, OrganizationRole.ADMIN)
 
-    plan = crud.plans.get_by_name(context.db_session, body.plan_name)
+    plan = await crud.plans.get_by_name(context.db_session, body.plan_name)
     if not plan:
         logger.error(f"Plan not found, plan_name={body.plan_name}")
         raise SubscriptionPlanNotFound(f"Plan={body.plan_name} not found")
@@ -151,7 +151,7 @@ async def create_customer_portal_session(
 ) -> str:
     acl.require_org_member_with_minimum_role(context.user, context.project.org_id, OrganizationRole.ADMIN)
 
-    active_subscription = crud.subscriptions.get_subscription_by_org_id(context.db_session, context.project.org_id)
+    active_subscription = await crud.subscriptions.get_subscription_by_org_id(context.db_session, context.project.org_id)
     if not active_subscription:
         logger.error(f"Subscription not found, the org is on the free plan, org_id={context.project.org_id}")
         raise BillingError(
@@ -174,7 +174,7 @@ async def create_customer_portal_session(
 @router.post("/webhook")
 async def handle_stripe_webhook(
         request: Request,
-        db_session: Annotated[Session, Depends(deps.yield_db_session)],
+        db_session: Annotated[AsyncSession, Depends(deps.yield_db_async_session2)],
         stripe_signature: str = Header(None),
 ) -> None:
     payload = await request.body()
@@ -204,7 +204,7 @@ async def handle_stripe_webhook(
     # Don't need to worry about race condition or locking here because our event
     # handlers are idempotent. The worst case is just the event is processed twice,
     # but only one of the two inserted into the processed_stripe_event table.
-    if crud.processed_stripe_event.is_event_processed(db_session, event.id):
+    if await crud.processed_stripe_event.is_event_processed(db_session, event.id):
         logger.info(f"Event already processed, skipping, event_id={event.id}")
         return
 
@@ -225,8 +225,8 @@ async def handle_stripe_webhook(
 
     # 4. Record Processed Event
     try:
-        crud.processed_stripe_event.record_processed_event(db_session, event.id)
-        db_session.commit()
+        await crud.processed_stripe_event.record_processed_event(db_session, event.id)
+        await db_session.commit()
     except IntegrityError as e:
         logger.warning(
             f"The event has already been processed and inserted into the processed_stripe_event table, "
@@ -241,7 +241,7 @@ async def handle_stripe_webhook(
     )
 
 
-async def handle_checkout_session_completed(session_data: dict, db_session: Session) -> None:
+async def handle_checkout_session_completed(session_data: dict, db_session: AsyncSession) -> None:
     """
     Handles the checkout.session.completed event.
     1. Retrieve the client_reference_id and subscription details from the session data
@@ -284,7 +284,7 @@ async def handle_checkout_session_completed(session_data: dict, db_session: Sess
     subscription_details = _parse_stripe_subscription_details(stripe_subscription)
 
     # 3. Find the plan corresponding to the subscription price id
-    plan = crud.plans.get_by_stripe_price_id(db_session, subscription_details.stripe_price_id)
+    plan = await crud.plans.get_by_stripe_price_id(db_session, subscription_details.stripe_price_id)
     if not plan:
         logger.error(
             f"Could not find internal plan matching stripe price id, stripe_price_id={subscription_details.stripe_price_id}"
@@ -297,7 +297,7 @@ async def handle_checkout_session_completed(session_data: dict, db_session: Sess
     # 4. Check if a subscription record already exists for this org. If it does, check
     # the stripe_subscription_id to make sure it matches. If it doesn't match, log an
     # error and return an error code. If it does match, no-op.
-    existing_sub = crud.subscriptions.get_subscription_by_stripe_id(
+    existing_sub = await crud.subscriptions.get_subscription_by_stripe_id(
         db_session, subscription_details.stripe_subscription_id
     )
     if existing_sub:
@@ -356,7 +356,7 @@ async def handle_checkout_session_completed(session_data: dict, db_session: Sess
         # Don't fail the webhook if PropelAuth update fails, just log the error
         # The subscription creation in our DB is still valid
 
-    db_session.commit()
+    await db_session.commit()
     logger.info(
         f"Successfully created/updated subscription record, org_id={client_reference_id}, stripe_subscription_id={stripe_subscription_id}"
     )
@@ -378,7 +378,7 @@ async def handle_checkout_session_completed(session_data: dict, db_session: Sess
 
 
 async def handle_customer_subscription_updated(
-        subscription_data: dict, db_session: Session
+        subscription_data: dict, db_session: AsyncSession
 ) -> None:
     """
     Handles the customer.subscription.updated event.
@@ -410,7 +410,7 @@ async def handle_customer_subscription_updated(
         )
 
     # 1.1 Find the existing subscription record in db using the stripe_subscription_id.
-    subscription = crud.subscriptions.get_subscription_by_stripe_id(
+    subscription = await crud.subscriptions.get_subscription_by_stripe_id(
         db_session, stripe_subscription_id
     )
     # 1.2 Retrieve the latest subscription object from Stripe using the stripe_subscription_id.
@@ -448,7 +448,7 @@ async def handle_customer_subscription_updated(
 
     # 3. If the subscription record exists, we update the subscription record with
     # the details from the latest subscription object from Stripe.
-    plan = crud.plans.get_by_stripe_price_id(
+    plan = await crud.plans.get_by_stripe_price_id(
         db_session, latest_subscription_details.stripe_price_id
     )
     if not plan:
@@ -472,7 +472,7 @@ async def handle_customer_subscription_updated(
         stripe_customer_id=latest_subscription_details.stripe_customer_id,
     )
 
-    subscription = crud.subscriptions.update_subscription_by_stripe_id(
+    subscription = await crud.subscriptions.update_subscription_by_stripe_id(
         db_session,
         latest_subscription_details.stripe_subscription_id,
         update_data,
@@ -503,7 +503,7 @@ async def handle_customer_subscription_updated(
         # Don't fail the webhook if PropelAuth update fails, just log the error
         # The subscription update in our DB is still valid
 
-    db_session.commit()
+    await db_session.commit()
 
     logger.info(
         f"Successfully updated subscription record, stripe_subscription_id={latest_subscription_details.stripe_subscription_id}"
@@ -511,7 +511,7 @@ async def handle_customer_subscription_updated(
 
 
 async def handle_customer_subscription_deleted(
-        subscription_data: dict, db_session: Session
+        subscription_data: dict, db_session: AsyncSession
 ) -> None:
     """
     Handles the customer.subscription.deleted event.
@@ -531,7 +531,7 @@ async def handle_customer_subscription_deleted(
         )
 
     # 1. Find the existing subscription record by stripe_subscription_id
-    subscription = crud.subscriptions.get_subscription_by_stripe_id(
+    subscription = await crud.subscriptions.get_subscription_by_stripe_id(
         db_session, stripe_subscription_id
     )
 
@@ -539,7 +539,7 @@ async def handle_customer_subscription_deleted(
         # 2. Update PropelAuth organization max_users to free plan limit
         try:
             # Get the free plan to determine the correct max_users value
-            plan = crud.plans.get_by_name(db_session, "free")
+            plan = await crud.plans.get_by_name(db_session, "free")
             if not plan:
                 logger.exception(f"Free plan not found, org_id={subscription.org_id}")
                 raise BillingError(
@@ -570,8 +570,8 @@ async def handle_customer_subscription_deleted(
             f"Deleting subscription record, stripe_subscription_id={stripe_subscription_id}, "
             f"org_id={subscription.org_id}, plan_id={subscription.plan_id}"
         )
-        crud.subscriptions.delete_subscription_by_stripe_id(db_session, stripe_subscription_id)
-        db_session.commit()
+        await crud.subscriptions.delete_subscription_by_stripe_id(db_session, stripe_subscription_id)
+        await db_session.commit()
     else:
         logger.error(
             f"Subscription record not found, stripe_subscription_id={stripe_subscription_id}"

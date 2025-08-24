@@ -6,7 +6,7 @@ from uuid import UUID
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import text
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from aci.common.exceptions import ProjectNotFound, MonthlyQuotaExceeded
 from aci.server.caching import get_cache
@@ -72,7 +72,7 @@ SQL_FETCH_LIMIT = text("""
 
 # ---------- Public API ----------
 async def consume_monthly_quota(
-        db_session: Session,
+        db_session: AsyncSession,
         project_id: UUID,
         consume_count: int = 1,
         *,
@@ -108,7 +108,7 @@ async def consume_monthly_quota(
 
     # If no cached limit, do a small read to get it (and seed cache)
     if limit is None:
-        row = db_session.execute(SQL_FETCH_LIMIT, {"project_id": str(project_id)}).mappings().first()
+        row = (await db_session.execute(SQL_FETCH_LIMIT, {"project_id": str(project_id)})).mappings().first()
         if row is None:
             raise ProjectNotFound(f"project {project_id} not found")
         limit = int(row["monthly_quota_limit"])
@@ -131,7 +131,7 @@ async def consume_monthly_quota(
         current = await cache.get(ckey)
         if current is None:
             # seed from DB monthly_quota_used for better accuracy
-            row = db_session.execute(SQL_FETCH_LIMIT, {"project_id": str(project_id)}).mappings().first()
+            row = (await db_session.execute(SQL_FETCH_LIMIT, {"project_id": str(project_id)})).mappings().first()
             if row is None:
                 raise ProjectNotFound(f"project {project_id} not found")
             # If DB month differs, usage should be 0 (the SQL increment handles roll anyway)
@@ -157,18 +157,18 @@ async def consume_monthly_quota(
         "cur_month": mstart.date().isoformat(),
         "consume": int(consume_count),
     }
-    res = db_session.execute(SQL_INCREMENT, params)
+    res = await db_session.execute(SQL_INCREMENT, params)
     row = res.mappings().first()
 
     if row is None:
         # Determine if this is “not found” vs “quota exceeded”.
         # Quick existence check:
-        exists = db_session.execute(SQL_FETCH_LIMIT, {"project_id": str(project_id)}).mappings().first()
+        exists = (await db_session.execute(SQL_FETCH_LIMIT, {"project_id": str(project_id)})).mappings().first()
         if not exists:
             raise ProjectNotFound(f"project {project_id} not found")
         # Hard cap hit
         # Roll back any uncommitted changes (safe to call)
-        db_session.rollback()
+        await db_session.rollback()
         # Clamp cache to limit to avoid further optimistic overages
         try:
             await cache.set(ckey, limit, ttl=ttl)
@@ -185,4 +185,4 @@ async def consume_monthly_quota(
         pass
 
     # Commit since we wrote
-    db_session.commit()
+    await db_session.commit()

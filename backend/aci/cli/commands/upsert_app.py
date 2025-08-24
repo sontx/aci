@@ -4,11 +4,12 @@ from uuid import UUID
 
 import click
 from deepdiff import DeepDiff
-from jinja2 import Environment, FileSystemLoader, StrictUndefined, Template, DebugUndefined
+from jinja2 import Environment, FileSystemLoader, Template, DebugUndefined
 from rich.console import Console
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from aci.cli import config
+from aci.cli.async_command import async_command
 from aci.common import utils
 from aci.common.db import crud
 from aci.common.db.sql_models import App
@@ -17,7 +18,7 @@ from aci.common.schemas.app import AppUpsert
 console = Console()
 
 
-@click.command()
+@async_command()
 @click.option(
     "--app-file",
     "app_file",
@@ -38,18 +39,18 @@ console = Console()
     is_flag=True,
     help="Provide this flag to run the command and apply changes to the database",
 )
-def upsert_app(app_file: Path, secrets_file: Path | None, skip_dry_run: bool) -> UUID:
+async def upsert_app(app_file: Path, secrets_file: Path | None, skip_dry_run: bool) -> UUID:
     """
     Insert or update an App in the DB from a JSON file, optionally injecting secrets.
     If an app with the given name already exists, performs an update; otherwise, creates a new app.
     For changing the app name of an existing app, use the <PLACEHOLDER> command.
     """
-    with utils.create_db_session(config.DB_FULL_URL) as db_session:
-        return upsert_app_helper(db_session, app_file, secrets_file, skip_dry_run)
+    async with utils.create_db_async_session(config.DB_FULL_URL) as db_session:
+        return await upsert_app_helper(db_session, app_file, secrets_file, skip_dry_run)
 
 
-def upsert_app_helper(
-        db_session: Session, app_file: Path, secrets_file: Path | None, skip_dry_run: bool
+async def upsert_app_helper(
+        db_session: AsyncSession, app_file: Path, secrets_file: Path | None, skip_dry_run: bool
 ) -> UUID:
     # Load secrets if provided
     secrets = {}
@@ -64,13 +65,13 @@ def upsert_app_helper(
         raise e
 
     app_upsert = AppUpsert.model_validate(json.loads(rendered_content))
-    existing_app = crud.apps.get_app(
+    existing_app = await crud.apps.get_app(
         db_session, app_upsert.name, public_only=False, active_only=False
     )
     if existing_app is None:
-        return create_app_helper(db_session, app_upsert, skip_dry_run)
+        return await create_app_helper(db_session, app_upsert, skip_dry_run)
     else:
-        return update_app_helper(
+        return await update_app_helper(
             db_session,
             existing_app,
             app_upsert,
@@ -78,22 +79,22 @@ def upsert_app_helper(
         )
 
 
-def create_app_helper(db_session: Session, app_upsert: AppUpsert, skip_dry_run: bool) -> UUID:
+async def create_app_helper(db_session: AsyncSession, app_upsert: AppUpsert, skip_dry_run: bool) -> UUID:
     # Create the app entry in the database
-    app = crud.apps.create_app(db_session, app_upsert)
+    app = await crud.apps.create_app(db_session, app_upsert)
 
     if not skip_dry_run:
         console.rule(f"Provide [bold green]--skip-dry-run[/bold green] to create App={app.name}")
-        db_session.rollback()
+        await db_session.rollback()
     else:
-        db_session.commit()
+        await db_session.commit()
         console.rule(f"Created App={app.name}")
 
     return app.id
 
 
-def update_app_helper(
-        db_session: Session, existing_app: App, app_upsert: AppUpsert, skip_dry_run: bool
+async def update_app_helper(
+        db_session: AsyncSession, existing_app: App, app_upsert: AppUpsert, skip_dry_run: bool
 ) -> UUID:
     """
     Update an existing app in the database.
@@ -108,7 +109,7 @@ def update_app_helper(
         console.rule(f"App={existing_app.name} exists and will be updated")
 
     # Update the app in the database with the new fields and optional embedding update
-    updated_app = crud.apps.update_app(db_session, existing_app, app_upsert)
+    updated_app = await crud.apps.update_app(db_session, existing_app, app_upsert)
 
     diff = DeepDiff(existing_app_upsert.model_dump(), app_upsert.model_dump(), ignore_order=True)
 
@@ -116,9 +117,9 @@ def update_app_helper(
         console.rule(
             f"Provide [bold green]--skip-dry-run[/bold green] to update App={existing_app.name} with the following changes:"
         )
-        db_session.rollback()
+        await db_session.rollback()
     else:
-        db_session.commit()
+        await db_session.commit()
         console.rule(f"Updated App={existing_app.name}")
 
     console.print(diff.pretty())

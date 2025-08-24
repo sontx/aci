@@ -6,7 +6,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from aci.common.db import crud
 from aci.common.db.sql_models import Function, Project
@@ -49,7 +49,7 @@ async def list_functions(
         query_params: Annotated[FunctionsList, Query()],
 ) -> list[Function]:
     """Get a list of functions and their details. Sorted by function name."""
-    return crud.functions.get_functions(
+    return await crud.functions.get_functions(
         context.db_session,
         context.project.visibility_access == Visibility.PUBLIC,
         True,
@@ -80,7 +80,7 @@ async def search_functions(
     else:
         apps_to_filter = query_params.app_names
 
-    functions = crud.functions.search_functions(
+    functions = await crud.functions.search_functions(
         context.db_session,
         context.project.visibility_access == Visibility.PUBLIC,
         True,
@@ -134,7 +134,7 @@ async def get_function_definition(
     Return the function definition that can be used directly by LLM.
     The actual content depends on the FunctionDefinitionFormat and the function itself.
     """
-    function: Function | None = crud.functions.get_function(
+    function: Function | None = await crud.functions.get_function(
         context.db_session,
         function_name,
         context.project.visibility_access == Visibility.PUBLIC,
@@ -142,7 +142,7 @@ async def get_function_definition(
     )
     if not function:
         # Try to get the function by name from user apps
-        function = crud.functions.get_user_function_by_name(
+        function = await crud.functions.get_user_function_by_name(
             context.db_session,
             function_name,
             project_id=context.project.id,
@@ -199,7 +199,7 @@ async def execute(
     execution_id = request_id_ctx_var.get(None)
     execution_id = UUID(execution_id) if execution_id else uuid.uuid4()
 
-    log_appender.enqueue(
+    await log_appender.enqueue(
         function_name=function_name,
         app_name=app_name,
         project_id=context.project.id,
@@ -255,7 +255,7 @@ async def execute(
 
 
 async def execute_function(
-        db_session: Session,
+        db_session: AsyncSession,
         project: Project,
         function_name: str,
         function_input: dict,
@@ -283,7 +283,7 @@ async def execute_function(
         LinkedAccountDisabled: If the linked account is disabled
     """
     # Get the function
-    function = crud.functions.get_function(
+    function = await crud.functions.get_function(
         db_session,
         function_name,
         project.visibility_access == Visibility.PUBLIC,
@@ -291,7 +291,7 @@ async def execute_function(
     )
     if not function:
         # Try to get the function by name from user apps
-        function = crud.functions.get_user_function_by_name(
+        function = await crud.functions.get_user_function_by_name(
             db_session,
             function_name,
             project_id=project_id,
@@ -304,7 +304,7 @@ async def execute_function(
             raise FunctionNotFound(f"function={function_name} not found")
 
     # Check if the App (that this function belongs to) is configured
-    app_configuration = crud.app_configurations.get_app_configuration(
+    app_configuration = await crud.app_configurations.get_app_configuration(
         db_session, project.id, function.app.name
     )
     if not app_configuration:
@@ -326,7 +326,7 @@ async def execute_function(
         )
 
     # Check if the linked account status (configured, enabled, etc.)
-    linked_account = crud.linked_accounts.get_linked_account(
+    linked_account = await crud.linked_accounts.get_linked_account(
         db_session,
         project.id,
         function.app.name,
@@ -356,7 +356,7 @@ async def execute_function(
         app_configuration.app, app_configuration, linked_account
     )
 
-    scm.update_security_credentials(
+    await scm.update_security_credentials(
         db_session, function.app, linked_account, security_credentials_response
     )
 
@@ -366,7 +366,7 @@ async def execute_function(
         f"linked_account_id={linked_account.id}, is_updated={security_credentials_response.is_updated}, "
         f"is_app_default_credentials={security_credentials_response.is_app_default_credentials}"
     )
-    db_session.commit()
+    await db_session.commit()
 
     function_executor = get_executor(function.protocol, linked_account)
     logger.info(
@@ -383,12 +383,12 @@ async def execute_function(
     )
 
     last_used_at: datetime = datetime.now(UTC)
-    crud.linked_accounts.update_linked_account_last_used_at(
+    await crud.linked_accounts.update_linked_account_last_used_at(
         db_session,
         last_used_at,
         linked_account,
     )
-    db_session.commit()
+    await db_session.commit()
 
     if not execution_result.success:
         logger.error(
@@ -397,36 +397,3 @@ async def execute_function(
         )
 
     return execution_result, function.app.name, linked_account_owner_id, app_configuration.id
-
-
-async def get_functions_definitions(
-        db_session: Session,
-        function_names: list[str],
-        format: FunctionDefinitionFormat = FunctionDefinitionFormat.BASIC,
-) -> list[
-    BasicFunctionDefinition
-    | OpenAIFunctionDefinition
-    | OpenAIResponsesFunctionDefinition
-    | AnthropicFunctionDefinition
-    ]:
-    """
-    Get function definitions for a list of function names.
-
-    Args:
-        db_session: Database session
-        function_names: List of function names to get definitions for
-        format: Format of the function definition to return
-
-    Returns:
-        List of function definitions in the requested format
-    """
-    # Query functions by name
-    functions = db_session.query(Function).filter(Function.name.in_(function_names)).all()
-
-    # Get function definitions
-    function_definitions = []
-    for function in functions:
-        function_definition = format_function_definition(function, format)
-        function_definitions.append(function_definition)
-
-    return function_definitions

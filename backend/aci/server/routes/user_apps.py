@@ -33,13 +33,14 @@ async def create_user_app(
     The app name will be automatically prefixed and converted to uppercase.
     """
     try:
-        app = crud.apps.create_user_app(
+        app = await crud.apps.create_user_app(
             context.db_session,
             app_upsert,
             context.project.id,
         )
-        context.db_session.commit()
-        return to_app_details(app)
+        app_details = to_app_details(app)
+        await context.db_session.commit()
+        return app_details
     except ConflictError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
 
@@ -55,7 +56,7 @@ async def list_user_apps(
     """
     Get a list of user's organization apps.
     """
-    apps = crud.apps.get_user_apps(
+    apps = await crud.apps.get_user_apps(
         context.db_session,
         context.project.id,
         True,  # active_only
@@ -85,7 +86,7 @@ async def search_user_apps(
     Search user's organization apps with pagination.
     """
     # Get total count for pagination
-    total = crud.apps.count_user_apps(
+    total = await crud.apps.count_user_apps(
         context.db_session,
         context.project.id,
         False,  # User can search inactive apps
@@ -94,7 +95,7 @@ async def search_user_apps(
     )
 
     # Get filtered apps
-    apps = crud.apps.get_user_apps(
+    apps = await crud.apps.get_user_apps(
         context.db_session,
         context.project.id,
         False,
@@ -120,7 +121,7 @@ async def get_user_app_details(
     """
     Get details of a specific user app by name.
     """
-    app = crud.apps.get_user_app_by_name(
+    app = await crud.apps.get_user_app_by_name(
         context.db_session,
         app_name,
         context.project.id,
@@ -160,14 +161,15 @@ async def update_user_app(
     Note: App name cannot be changed once created.
     """
     try:
-        app = crud.apps.update_user_app(
+        app = await crud.apps.update_user_app(
             context.db_session,
             app_name,
             app_upsert,
             context.project.id,
         )
-        context.db_session.commit()
-        return to_app_details(app)
+        app_details = to_app_details(app)
+        await context.db_session.commit()
+        return app_details
     except ConflictError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
 
@@ -181,12 +183,12 @@ async def delete_user_app(
     Delete a user app by name.
     """
     try:
-        crud.apps.delete_user_app(
+        await crud.apps.delete_user_app(
             context.db_session,
             app_name,
             context.project.id,
         )
-        context.db_session.commit()
+        await context.db_session.commit()
     except ConflictError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
 
@@ -200,7 +202,7 @@ async def get_user_app_functions(
     Get all functions of a user app by name.
     """
     # Use the new CRUD method that properly filters by project ID
-    app_functions_raw = crud.functions.get_user_functions_by_app_name(
+    app_functions_raw = await crud.functions.get_user_functions_by_app_name(
         context.db_session,
         app_name,
         context.project.id,
@@ -235,7 +237,7 @@ async def create_user_app_functions(
         )
 
     try:
-        functions = crud.functions.create_user_functions(
+        functions = await crud.functions.create_user_functions(
             context.db_session,
             app_name,
             functions_upsert,
@@ -243,7 +245,8 @@ async def create_user_app_functions(
             remove_previous,
             context.project.id,
         )
-        context.db_session.commit()
-        return [format_function_definition(function, format=FunctionDefinitionFormat.BASIC) for function in functions]
+        functions = [format_function_definition(function, format=FunctionDefinitionFormat.BASIC) for function in functions]
+        await context.db_session.commit()
+        return functions
     except ConflictError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))

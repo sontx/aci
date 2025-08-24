@@ -5,27 +5,28 @@ from rich.console import Console
 from rich.syntax import Syntax
 
 from aci.cli import config
+from aci.cli.async_command import async_command
 from aci.common import utils
 from aci.common.db import crud
 
 console = Console()
 
 
-@click.command()
+@async_command()
 @click.option(
     "--app-name",
     "app_name",
     required=True,
     help="Name of the app to retrieve",
 )
-def get_app(
+async def get_app(
     app_name: str,
 ) -> None:
     """
     Get an app by name from the database.
     """
-    with utils.create_db_session(config.DB_FULL_URL) as db_session:
-        app = crud.apps.get_app(
+    async with utils.create_db_async_session(config.DB_FULL_URL) as db_session:
+        app = await crud.apps.get_app(
             db_session,
             app_name,
             public_only=False,
@@ -46,7 +47,8 @@ def get_app(
                 app_dict[key] = value
 
         # Add function count
-        app_dict["function_count"] = len(app.functions) if hasattr(app, "functions") else 0
+        functions = await app.awaitable_attrs.functions
+        app_dict["function_count"] = len(functions) if hasattr(app, "functions") else 0
 
         # Convert to JSON string with nice formatting
         json_str = json.dumps(app_dict, indent=2, default=str)

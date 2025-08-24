@@ -5,6 +5,7 @@ from functools import cache
 from uuid import UUID
 
 from sqlalchemy import Engine, create_engine
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, AsyncEngine, async_sessionmaker
 from sqlalchemy.orm import Session, sessionmaker
 
 from aci.common.logging_setup import get_logger
@@ -73,6 +74,31 @@ def get_sessionmaker(db_url: str) -> sessionmaker:
 def create_db_session(db_url: str) -> Session:
     SessionMaker = get_sessionmaker(db_url)
     session: Session = SessionMaker()
+
+    return session
+
+
+@cache
+def get_db_async_engine(db_url: str) -> AsyncEngine:
+    return create_async_engine(
+        db_url,
+        pool_size=10,
+        max_overflow=10,
+        pool_timeout=30,
+        pool_recycle=3600,  # recycle connections after 1 hour
+        pool_pre_ping=True,
+    )
+
+
+@cache
+def get_async_sessionmaker(db_url: str, expire_on_commit=True) -> async_sessionmaker:
+    engine = get_db_async_engine(db_url)
+    return async_sessionmaker(autocommit=False, autoflush=False, bind=engine, expire_on_commit=expire_on_commit)
+
+
+def create_db_async_session(db_url: str, expire_on_commit=True) -> AsyncSession:
+    AsyncSessionMaker = get_async_sessionmaker(db_url, expire_on_commit=expire_on_commit)
+    session: AsyncSession = AsyncSessionMaker()
 
     return session
 

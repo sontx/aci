@@ -5,9 +5,10 @@ import click
 from deepdiff import DeepDiff
 from rich.console import Console
 from rich.table import Table
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from aci.cli import config
+from aci.cli.async_command import async_command
 from aci.common import utils
 from aci.common.db import crud
 from aci.common.schemas.function import FunctionUpsert
@@ -15,7 +16,7 @@ from aci.common.schemas.function import FunctionUpsert
 console = Console()
 
 
-@click.command()
+@async_command()
 @click.option(
     "--functions-file",
     "functions_file",
@@ -28,7 +29,7 @@ console = Console()
     is_flag=True,
     help="Provide this flag to run the command and apply changes to the database",
 )
-def upsert_functions(functions_file: Path, skip_dry_run: bool) -> list[str]:
+async def upsert_functions(functions_file: Path, skip_dry_run: bool) -> list[str]:
     """
     Upsert functions in the DB from a JSON file.
 
@@ -39,11 +40,11 @@ def upsert_functions(functions_file: Path, skip_dry_run: bool) -> list[str]:
 
     Batch creation and update operations are performed.
     """
-    return upsert_functions_helper(functions_file, skip_dry_run)
+    return await upsert_functions_helper(functions_file, skip_dry_run)
 
 
-def upsert_functions_helper(functions_file: Path, skip_dry_run: bool) -> list[str]:
-    with utils.create_db_session(config.DB_FULL_URL) as db_session:
+async def upsert_functions_helper(functions_file: Path, skip_dry_run: bool) -> list[str]:
+    async with utils.create_db_async_session(config.DB_FULL_URL) as db_session:
         with open(functions_file) as f:
             functions_data = json.load(f)
 
@@ -53,13 +54,13 @@ def upsert_functions_helper(functions_file: Path, skip_dry_run: bool) -> list[st
         ]
         app_name = _validate_all_functions_belong_to_the_app(functions_upsert)
         console.rule(f"App={app_name}")
-        _validate_app_exists(db_session, app_name)
+        await _validate_app_exists(db_session, app_name)
 
         new_functions: list[FunctionUpsert] = []
         existing_functions: list[FunctionUpsert] = []
 
         for function_upsert in functions_upsert:
-            existing_function = crud.functions.get_function(
+            existing_function = await crud.functions.get_function(
                 db_session, function_upsert.name, public_only=False, active_only=False
             )
 
@@ -69,9 +70,9 @@ def upsert_functions_helper(functions_file: Path, skip_dry_run: bool) -> list[st
                 existing_functions.append(function_upsert)
 
         console.rule("Checking functions to create...")
-        functions_created = create_functions_helper(db_session, new_functions)
+        functions_created = await create_functions_helper(db_session, new_functions)
         console.rule("Checking functions to update...")
-        functions_updated = update_functions_helper(db_session, existing_functions)
+        functions_updated = await update_functions_helper(db_session, existing_functions)
         # for functions that are in existing_functions but not in functions_updated
         functions_unchanged = [
             func.name for func in existing_functions if func.name not in functions_updated
@@ -79,9 +80,9 @@ def upsert_functions_helper(functions_file: Path, skip_dry_run: bool) -> list[st
 
         if not skip_dry_run:
             console.rule("Provide [bold green]--skip-dry-run[/bold green] to upsert functions")
-            db_session.rollback()
+            await db_session.rollback()
         else:
-            db_session.commit()
+            await db_session.commit()
             console.rule("[bold green]Upserted functions[/bold green]")
 
         table = Table("Function Name", "Operation")
@@ -97,23 +98,23 @@ def upsert_functions_helper(functions_file: Path, skip_dry_run: bool) -> list[st
         return functions_created + functions_updated
 
 
-def create_functions_helper(
-    db_session: Session, functions_upsert: list[FunctionUpsert]
+async def create_functions_helper(
+        db_session: AsyncSession, functions_upsert: list[FunctionUpsert]
 ) -> list[str]:
     """
     Batch creates functions in the database.
     Generates embeddings for each new function and calls the CRUD layer for creation.
     Returns a list of created function names.
     """
-    created_functions = crud.functions.create_functions(
+    created_functions = await crud.functions.create_functions(
         db_session, functions_upsert
     )
 
     return [func.name for func in created_functions]
 
 
-def update_functions_helper(
-    db_session: Session, functions_upsert: list[FunctionUpsert]
+async def update_functions_helper(
+        db_session: AsyncSession, functions_upsert: list[FunctionUpsert]
 ) -> list[str]:
     """
     Batch updates functions in the database.
@@ -125,7 +126,7 @@ def update_functions_helper(
     functions: list[FunctionUpsert] = []
 
     for function_upsert in functions_upsert:
-        existing_function = crud.functions.get_function(
+        existing_function = await crud.functions.get_function(
             db_session, function_upsert.name, public_only=False, active_only=False
         )
         if existing_function is None:
@@ -149,7 +150,7 @@ def update_functions_helper(
         functions.append(function_upsert)
 
     # Note: the order matters here because the embeddings need to match the functions
-    functions_updated = crud.functions.update_functions(
+    functions_updated = await crud.functions.update_functions(
         db_session,
         functions,
     )
@@ -157,14 +158,14 @@ def update_functions_helper(
     return [func.name for func in functions_updated]
 
 
-def _validate_app_exists(db_session: Session, app_name: str) -> None:
-    app = crud.apps.get_app(db_session, app_name, False, False)
+async def _validate_app_exists(db_session: AsyncSession, app_name: str) -> None:
+    app = await crud.apps.get_app(db_session, app_name, False, False)
     if not app:
         raise click.ClickException(f"App={app_name} does not exist")
 
 
 def _validate_all_functions_belong_to_the_app(
-    functions_upsert: list[FunctionUpsert],
+        functions_upsert: list[FunctionUpsert],
 ) -> str:
     app_names = {utils.parse_app_name_from_function_name(func.name) for func in functions_upsert}
     if len(app_names) != 1:

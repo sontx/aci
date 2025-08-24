@@ -18,7 +18,7 @@ from __future__ import annotations
 from datetime import datetime, date
 from typing import Any
 from uuid import UUID, uuid4
-
+from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy import (
     Boolean,
     DateTime,
@@ -56,7 +56,7 @@ APP_NAME_MAX_LENGTH = 100
 MAX_STRING_LENGTH = 255
 
 
-class Base(MappedAsDataclass, DeclarativeBase):
+class Base(MappedAsDataclass, AsyncAttrs, DeclarativeBase):
     pass
 
 
@@ -141,7 +141,8 @@ class APIKey(Base):
         init=False,
     )
 
-    project: Mapped[Project] = relationship("Project", lazy="select", init=False)
+    # Eager load because the project is frequently accessed together with the API key
+    project: Mapped[Project] = relationship("Project", lazy="selectin", init=False)
 
     # unique constraint: name is unique within a project
     __table_args__ = (
@@ -195,7 +196,8 @@ class Function(Base):
     project_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), nullable=True, index=True, default=None)
 
     # the App that this function belongs to
-    app: Mapped[App] = relationship("App", lazy="select", back_populates="functions", init=False)
+    # Eager load because the app is frequently accessed together with the function
+    app: Mapped[App] = relationship("App", lazy="selectin", back_populates="functions", init=False)
 
     @property
     def app_name(self) -> str:
@@ -333,7 +335,8 @@ class AppConfiguration(Base):
         init=False,
     )
 
-    app: Mapped[App] = relationship("App", lazy="select", init=False)
+    # Eager load because the app is frequently accessed together with the app configuration
+    app: Mapped[App] = relationship("App", lazy="selectin", init=False)
 
     @property
     def app_name(self) -> str:
@@ -383,10 +386,6 @@ class MCPServer(Base):
     )
 
     app_configuration: Mapped[AppConfiguration] = relationship("AppConfiguration", lazy="select", init=False)
-
-    @property
-    def app_name(self) -> str:
-        return str(self.app_configuration.app_name)
 
     # unique constraint: name is unique within an app configuration
     __table_args__ = (
@@ -447,10 +446,6 @@ class LinkedAccount(Base):
     )
 
     app: Mapped[App] = relationship("App", lazy="select", init=False)
-
-    @property
-    def app_name(self) -> str:
-        return str(self.app.name)
 
     __table_args__ = (
         # TODO: write test

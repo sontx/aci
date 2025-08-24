@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from aci.common import utils
 from aci.common.db import crud
@@ -14,8 +14,8 @@ from aci.common.schemas.function import FunctionUpsert, FunctionUpdate
 logger = get_logger(__name__)
 
 
-def create_functions(
-        db_session: Session,
+async def create_functions(
+        db_session: AsyncSession,
         functions_upsert: list[FunctionUpsert],
 ) -> list[Function]:
     """
@@ -27,7 +27,7 @@ def create_functions(
     functions = []
     for i, function_upsert in enumerate(functions_upsert):
         app_name = utils.parse_app_name_from_function_name(function_upsert.name)
-        app = crud.apps.get_app(db_session, app_name, False, False)
+        app = await crud.apps.get_app(db_session, app_name, False, False)
         if not app:
             logger.error(f"App={app_name} does not exist for function={function_upsert.name}")
             raise ValueError(f"App={app_name} does not exist for function={function_upsert.name}")
@@ -39,13 +39,13 @@ def create_functions(
         db_session.add(function)
         functions.append(function)
 
-    db_session.flush()
+    await db_session.flush()
 
     return functions
 
 
-def update_functions(
-        db_session: Session,
+async def update_functions(
+        db_session: AsyncSession,
         functions_upsert: list[FunctionUpsert],
 ) -> list[Function]:
     """
@@ -55,7 +55,7 @@ def update_functions(
     logger.debug(f"Updating functions, functions_upsert={functions_upsert}")
     functions = []
     for i, function_upsert in enumerate(functions_upsert):
-        function = crud.functions.get_function(db_session, function_upsert.name, False, False)
+        function = await crud.functions.get_function(db_session, function_upsert.name, False, False)
         if not function:
             logger.error(f"Function={function_upsert.name} does not exist")
             raise ValueError(f"Function={function_upsert.name} does not exist")
@@ -65,13 +65,13 @@ def update_functions(
             setattr(function, field, value)
         functions.append(function)
 
-    db_session.flush()
+    await db_session.flush()
 
     return functions
 
 
-def search_functions(
-        db_session: Session,
+async def search_functions(
+        db_session: AsyncSession,
         public_only: bool,
         active_only: bool,
         app_names: list[str] | None,
@@ -98,11 +98,12 @@ def search_functions(
     statement = statement.offset(offset).limit(limit)
     logger.debug(f"Executing statement, statement={statement}")
 
-    return list(db_session.execute(statement).scalars().all())
+    result = await db_session.execute(statement)
+    return list(result.scalars().all())
 
 
-def get_functions(
-        db_session: Session,
+async def get_functions(
+        db_session: AsyncSession,
         public_only: bool,
         active_only: bool,
         app_names: list[str] | None,
@@ -126,17 +127,19 @@ def get_functions(
 
     statement = statement.order_by(Function.name).offset(offset).limit(limit)
 
-    return list(db_session.execute(statement).scalars().all())
+    result = await db_session.execute(statement)
+    return list(result.scalars().all())
 
 
-def get_functions_by_app_id(db_session: Session, app_id: UUID) -> list[Function]:
+async def get_functions_by_app_id(db_session: AsyncSession, app_id: UUID) -> list[Function]:
     statement = select(Function).filter(Function.app_id == app_id)
 
-    return list(db_session.execute(statement).scalars().all())
+    result = await db_session.execute(statement)
+    return list(result.scalars().all())
 
 
-def get_function(
-        db_session: Session, function_name: str, public_only: bool, active_only: bool, project_id: UUID | None = None
+async def get_function(
+        db_session: AsyncSession, function_name: str, public_only: bool, active_only: bool, project_id: UUID | None = None
 ) -> Function | None:
     if project_id is None:
         # If project_id is None, we assume it's a global function
@@ -159,11 +162,12 @@ def get_function(
             Function.visibility == Visibility.PUBLIC
         )
 
-    return db_session.execute(statement).scalar_one_or_none()
+    result = await db_session.execute(statement)
+    return result.scalar_one_or_none()
 
 
-def get_user_function_by_name(
-        db_session: Session,
+async def get_user_function_by_name(
+        db_session: AsyncSession,
         function_name: str,
         project_id: UUID,
 ) -> Function | None:
@@ -171,11 +175,12 @@ def get_user_function_by_name(
     Get a user function by name, filtered by project_id.
     """
     statement = select(Function).filter(Function.project_id == project_id, Function.name == function_name)
-    return db_session.execute(statement).scalar_one_or_none()
+    result = await db_session.execute(statement)
+    return result.scalar_one_or_none()
 
 
-def get_user_functions_by_app_name(
-        db_session: Session,
+async def get_user_functions_by_app_name(
+        db_session: AsyncSession,
         app_name: str,
         project_id: UUID,
 ) -> list[Function]:
@@ -189,11 +194,12 @@ def get_user_functions_by_app_name(
     )
 
     statement = statement.order_by(Function.name)
-    return list(db_session.execute(statement).scalars().all())
+    result = await db_session.execute(statement)
+    return list(result.scalars().all())
 
 
-def delete_user_function(
-        db_session: Session,
+async def delete_user_function(
+        db_session: AsyncSession,
         function_name: str,
         project_id: UUID,
 ) -> None:
@@ -202,7 +208,7 @@ def delete_user_function(
     """
     logger.debug(f"Deleting user function: {function_name} for project_id: {project_id}")
 
-    function = get_user_function_by_name(db_session, function_name, project_id)
+    function = await get_user_function_by_name(db_session, function_name, project_id)
     if not function:
         raise FunctionNotFound(f"Function with name {function_name} not found on your organization")
 
@@ -210,12 +216,12 @@ def delete_user_function(
     if function.project_id is None:
         raise ConflictError("Cannot delete global function")
 
-    db_session.delete(function)
-    db_session.flush()
+    await db_session.delete(function)
+    await db_session.flush()
 
 
-def create_user_functions(
-        db_session: Session,
+async def create_user_functions(
+        db_session: AsyncSession,
         app_name: str,
         functions_upsert: list[FunctionUpsert],
         override_existing: bool,
@@ -228,7 +234,7 @@ def create_user_functions(
     logger.debug(
         f"Creating user functions for app name {app_name}, project_id={project_id}, override_existing={override_existing}, remove_previous={remove_previous}")
 
-    app = crud.apps.get_user_app_by_name(db_session, app_name, project_id)
+    app = await crud.apps.get_user_app_by_name(db_session, app_name, project_id)
     if not app:
         logger.error(f"User app={app_name} does not exist for project_id={project_id}")
         raise AppNotFound(f"User app {app_name} does not exist")
@@ -242,17 +248,17 @@ def create_user_functions(
 
     # Handle removal of previous functions if requested
     if remove_previous:
-        existing_functions = get_user_functions_by_app_name(db_session, app_name, project_id)
+        existing_functions = await get_user_functions_by_app_name(db_session, app_name, project_id)
         functions_to_remove = [func for func in existing_functions if func.name not in upsert_function_names]
 
         for func_to_remove in functions_to_remove:
             logger.debug(f"Removing previous function: {func_to_remove.name}")
-            db_session.delete(func_to_remove)
+            await db_session.delete(func_to_remove)
 
     functions = []
     for function_upsert in functions_upsert:
         # Check if function already exists
-        existing_function = get_user_function_by_name(db_session, function_upsert.name, project_id)
+        existing_function = await get_user_function_by_name(db_session, function_upsert.name, project_id)
 
         if existing_function:
             if override_existing:
@@ -277,13 +283,15 @@ def create_user_functions(
             )
             db_session.add(function)
             functions.append(function)
+            function.app = app  # Set the relationship for potential later use
 
-    db_session.flush()
+    await db_session.flush()
+
     return functions
 
 
-def update_user_function(
-        db_session: Session,
+async def update_user_function(
+        db_session: AsyncSession,
         function_name: str,
         function_update: FunctionUpdate,
         project_id: UUID,
@@ -293,7 +301,7 @@ def update_user_function(
     """
     logger.debug(f"Updating user function, function_update={function_name}, project_id={project_id}")
 
-    function = get_user_function_by_name(db_session, function_name, project_id)
+    function = await get_user_function_by_name(db_session, function_name, project_id)
     if not function:
         logger.error(f"User function={function_name} does not exist for project_id={project_id}")
         raise FunctionNotFound(f"User function={function_name} does not exist on your organization")
@@ -302,13 +310,13 @@ def update_user_function(
     for field, value in function_data.items():
         setattr(function, field, value)
 
-    db_session.flush()
+    await db_session.flush()
 
     return function
 
 
-def get_user_function_tags(
-        db_session: Session,
+async def get_user_function_tags(
+        db_session: AsyncSession,
         project_id: UUID,
 ) -> list[str]:
     """
@@ -318,7 +326,8 @@ def get_user_function_tags(
         (Function.project_id == project_id) | (Function.project_id.is_(None))
     ).distinct(Function.tags)
 
-    functions = db_session.execute(statement).scalars().all()
+    result = await db_session.execute(statement)
+    functions = result.scalars().all()
     tags = set()
 
     for function in functions:
