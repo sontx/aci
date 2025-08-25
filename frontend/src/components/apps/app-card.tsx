@@ -1,6 +1,5 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
@@ -15,9 +14,10 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { type App } from "@/lib/types/app";
-import { CheckCircle } from "lucide-react";
+import { CircleCheckBig } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { Badge } from "@/components/ui/badge";
 
 interface AppCardProps {
   app: App;
@@ -28,10 +28,25 @@ export function AppCard({ app, isConfigured = false }: AppCardProps) {
   return (
     <Link href={`/apps/${app.name}`} className="block">
       <Card className="h-[300px] transition-shadow hover:shadow-lg flex flex-col overflow-hidden relative">
+        {isConfigured && (
+          <div className="absolute top-2 right-2">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <CircleCheckBig className="h-5 w-5 text-green-700" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>App already configured for this project</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+        )}
+
         <CardHeader className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between min-w-0">
             <div className="flex items-center gap-3 min-w-0 flex-1 mr-4">
-              <div className="relative h-12 w-12 flex-shrink-0 overflow-hidden rounded-lg">
+              <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg">
                 <Image
                   src={app.logo || "/icon/default-app-icon.svg"}
                   alt={`${app.name} logo`}
@@ -40,25 +55,22 @@ export function AppCard({ app, isConfigured = false }: AppCardProps) {
                 />
               </div>
               <div>
-                <CardTitle className="truncate">{app.display_name}</CardTitle>
-                {isConfigured && (
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Badge
-                          variant="secondary"
-                          className="max-w-max mt-1 bg-green-100 text-green-700 border-green-200 flex items-center gap-1"
-                        >
-                          <CheckCircle className="h-3 w-3" />
-                          Configured
-                        </Badge>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>App already configured for this project</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                )}
+                <CardTitle className="truncate mb-1">
+                  {app.display_name}
+                </CardTitle>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground font-mono">
+                  <Badge variant="outline" className="text-gray-600 font-normal">
+                    v{app.version}
+                  </Badge>
+                  {app.project_id && (
+                    <Badge
+                      variant="outline"
+                      className="flex items-center gap-1 [word-spacing:-4px] text-gray-600 font-normal"
+                    >
+                      User App
+                    </Badge>
+                  )}
+                </div>
               </div>
             </div>
           </div>

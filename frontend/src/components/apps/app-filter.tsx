@@ -53,8 +53,11 @@ export function AppFilter({
         defaultValue={FilterCategory.ALL}
         value={selectedCategory}
       >
-        <SelectTrigger className="w-[160px]">
-          <SelectValue placeholder="all" />
+        <SelectTrigger className="w-auto min-w-[200px]">
+          <div className="pr-2">
+            <span className="text-muted-foreground mr-1">Category:</span>
+            <SelectValue placeholder="all" />
+          </div>
         </SelectTrigger>
         <SelectContent>
           <SelectItem value={FilterCategory.ALL}>All Apps</SelectItem>
@@ -72,15 +75,20 @@ export function AppFilter({
         </SelectContent>
       </Select>
 
-      <Select onValueChange={onSortChange} defaultValue={SortOption.DEFAULT} value={sortOrder}>
-        <SelectTrigger className="w-[180px]">
-          <SelectValue placeholder="Default" />
+      <Select
+        onValueChange={onSortChange}
+        defaultValue={SortOption.DEFAULT}
+        value={sortOrder}
+      >
+        <SelectTrigger className="w-auto min-w-[180px]">
+          <div className="pr-2">
+            <span className="text-muted-foreground mr-1">Sort:</span>
+            <SelectValue placeholder="Default" />
+          </div>
         </SelectTrigger>
         <SelectContent>
           <SelectItem value={SortOption.DEFAULT}>Default</SelectItem>
-          <SelectItem value={SortOption.ALPHABETICAL}>
-            Ascending A-Z
-          </SelectItem>
+          <SelectItem value={SortOption.ALPHABETICAL}>Ascending A-Z</SelectItem>
           <SelectItem value={SortOption.REVERSE_ALPHABETICAL}>
             Descending Z-A
           </SelectItem>
