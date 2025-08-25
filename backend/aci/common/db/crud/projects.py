@@ -2,7 +2,7 @@
 CRUD operations for projects, including direct entities under a project such as API keys.
 TODO: function todelete project and all related data (app_configurations, api_keys, etc.)
 """
-from _pydatetime import date
+from datetime import date
 from uuid import UUID
 
 from sqlalchemy import func, select, update

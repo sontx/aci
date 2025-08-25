@@ -9,10 +9,10 @@ import {
 import {
   createContext,
   ReactNode,
-  useContext,
-  useState,
-  useEffect,
   useCallback,
+  useContext,
+  useEffect,
+  useState,
 } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UserClass } from "@propelauth/javascript";
@@ -33,6 +33,8 @@ interface MetaInfoContextType {
   activeProject: Project;
   reloadActiveProject: () => Promise<void>;
   setActiveProject: (project: Project) => void;
+  setActiveProjectId: (projectId: string) => void;
+  setActiveOrgId: (orgId: string) => void;
   accessToken: string;
 }
 
@@ -121,6 +123,26 @@ export const MetaInfoProvider = withRequiredAuthInfo<MetaInfoProviderProps>(
       }
     }, [reloadProjectsFunc, activeOrg, accessToken]);
 
+    const setActiveProjectId = useCallback(
+      (projectId: string) => {
+        const project = projects.find((p) => p.id === projectId);
+        if (project) {
+          setActiveProject(project);
+        }
+      },
+      [projects],
+    );
+
+    const setActiveOrgId = useCallback(
+      (orgId: string) => {
+        const org = orgs.find((o) => o.orgId === orgId);
+        if (org) {
+          setActiveOrg(org);
+        }
+      },
+      [orgs],
+    );
+
     return (
       <div>
         {activeOrg &&
@@ -134,9 +156,11 @@ export const MetaInfoProvider = withRequiredAuthInfo<MetaInfoProviderProps>(
               orgs,
               activeOrg,
               setActiveOrg: handleSetActiveOrg,
+              setActiveOrgId,
               projects,
               activeProject,
               setActiveProject,
+              setActiveProjectId,
               reloadActiveProject,
               accessToken,
             }}
